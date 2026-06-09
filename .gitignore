@@ -1,0 +1,24 @@
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/report.md
+contracts/.gas-snapshot
+
+# Rust (verifier)
+verifier/target/
+
+# Node (agents, web)
+node_modules/
+dist/
+.next/
+.turbo/
+
+# Env / secrets — never commit keys, RPC creds, or pinning tokens
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.log
