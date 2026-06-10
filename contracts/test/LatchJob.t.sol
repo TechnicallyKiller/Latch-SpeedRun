@@ -26,7 +26,7 @@ contract LatchJobTest is LatchTestBase {
 
     function test_createJob_revertsUnregisteredVerifier() public {
         vm.prank(buyer);
-        vm.expectRevert(LatchJob.VerifierNotRegistered.selector);
+        vm.expectRevert(LatchJob.VerifierNotActive.selector);
         latch.createJob(provider, makeAddr("rogue"), AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
     }
 
@@ -61,9 +61,10 @@ contract LatchJobTest is LatchTestBase {
     function test_fundJob_pullsExactAmount() public {
         uint256 jobId = _createJob();
         uint256 buyerBefore = usdc.balanceOf(buyer);
+        uint256 latchBefore = usdc.balanceOf(address(latch)); // already holds the verifier stake
         _fund(jobId);
 
-        assertEq(usdc.balanceOf(address(latch)), AMOUNT);
+        assertEq(usdc.balanceOf(address(latch)) - latchBefore, AMOUNT);
         assertEq(usdc.balanceOf(buyer), buyerBefore - AMOUNT);
         assertEq(latch.totalEscrowed(), AMOUNT);
         assertEq(uint8(latch.getJob(jobId).state), uint8(LatchJob.State.Funded));
@@ -158,13 +159,14 @@ contract LatchJobTest is LatchTestBase {
         latch.submitVerdict(jobId, true, 95, keccak256("r"), "ipfs://e", deadline, sig);
     }
 
-    function test_submitVerdict_revertsAfterVerifierDeregistered() public {
+    function test_submitVerdict_revertsAfterVerifierUnstaked() public {
         uint256 jobId = _createJob();
         _fund(jobId);
         _accept(jobId);
         _submit(jobId);
-        vm.prank(owner);
-        latch.setVerifier(verifier, false);
+        // verifier exits the set by unstaking below the minimum -> no longer active
+        vm.prank(verifier);
+        latch.unstakeVerifier(MIN_VERIFIER_STAKE);
         uint256 deadline = block.timestamp + 1 hours;
         bytes memory sig = _signVerdict(verifierPk, jobId, true, 95, keccak256("r"), "ipfs://e", deadline);
         vm.expectRevert(LatchJob.InvalidVerifierSignature.selector);
@@ -307,10 +309,11 @@ contract LatchJobTest is LatchTestBase {
         vm.prank(disputeResolver);
         latch.resolveDispute(jobId, false);
 
-        // buyer refunded amount + slashed provider bond + challenger bond returned
-        assertEq(latch.withdrawable(buyer), AMOUNT + PROVIDER_BOND + CHALLENGE_BOND);
+        // buyer refunded amount + slashed provider bond + challenger bond returned + slashed verifier stake
+        assertEq(latch.withdrawable(buyer), AMOUNT + PROVIDER_BOND + CHALLENGE_BOND + SLASH_PER_VERDICT);
         assertEq(latch.withdrawable(provider), 0);
         assertEq(latch.withdrawable(feeRecipient), 0);
+        assertEq(latch.verifierStake(verifier), MIN_VERIFIER_STAKE - SLASH_PER_VERDICT, "verifier slashed");
         assertEq(uint8(latch.getJob(jobId).state), uint8(LatchJob.State.Refunded));
         _assertSolvent();
     }
@@ -323,10 +326,11 @@ contract LatchJobTest is LatchTestBase {
         latch.resolveDispute(jobId, true);
 
         uint256 fee = (AMOUNT * FEE_BPS) / 10_000;
-        // provider: proceeds + own bond + returned challenger bond
-        assertEq(latch.withdrawable(provider), AMOUNT - fee + PROVIDER_BOND + CHALLENGE_BOND);
+        // provider: proceeds + own bond + returned challenger bond + slashed verifier stake
+        assertEq(latch.withdrawable(provider), AMOUNT - fee + PROVIDER_BOND + CHALLENGE_BOND + SLASH_PER_VERDICT);
         assertEq(latch.withdrawable(feeRecipient), fee);
         assertEq(latch.withdrawable(buyer), 0);
+        assertEq(latch.verifierStake(verifier), MIN_VERIFIER_STAKE - SLASH_PER_VERDICT, "verifier slashed");
         assertEq(uint8(latch.getJob(jobId).state), uint8(LatchJob.State.Released));
         _assertSolvent();
     }
@@ -398,14 +402,87 @@ contract LatchJobTest is LatchTestBase {
     // Admin / auth
     // ---------------------------------------------------------------------
 
-    function test_setVerifier_onlyOwner() public {
+    function test_setVerifierParams_onlyOwner() public {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
-        latch.setVerifier(makeAddr("v2"), true);
+        latch.setVerifierParams(1, 1, 1);
     }
 
     function test_setProtocolFee_revertsTooHigh() public {
         vm.prank(owner);
         vm.expectRevert(LatchJob.FeeTooHigh.selector);
         latch.setProtocolFee(1001);
+    }
+
+    // ---------------------------------------------------------------------
+    // Verifier staking
+    // ---------------------------------------------------------------------
+
+    function _stakeNew(string memory name) internal returns (address v) {
+        v = makeAddr(name);
+        usdc.mint(v, MIN_VERIFIER_STAKE);
+        vm.startPrank(v);
+        usdc.approve(address(latch), MIN_VERIFIER_STAKE);
+        latch.stakeVerifier(MIN_VERIFIER_STAKE);
+        vm.stopPrank();
+    }
+
+    function test_stake_activatesVerifier() public {
+        address v2 = makeAddr("v2");
+        assertFalse(latch.isActiveVerifier(v2));
+        _stakeNew("v2"); // re-derives same address from the label
+        assertTrue(latch.isActiveVerifier(v2));
+        assertEq(latch.verifierStake(v2), MIN_VERIFIER_STAKE);
+        assertEq(latch.totalVerifierStake(), MIN_VERIFIER_STAKE * 2); // base verifier (setUp) + v2
+        _assertSolvent();
+    }
+
+    function test_stake_belowMinIsInactive() public {
+        address v2 = makeAddr("v2");
+        usdc.mint(v2, MIN_VERIFIER_STAKE);
+        vm.startPrank(v2);
+        usdc.approve(address(latch), MIN_VERIFIER_STAKE);
+        latch.stakeVerifier(MIN_VERIFIER_STAKE - 1); // one short
+        vm.stopPrank();
+        assertFalse(latch.isActiveVerifier(v2));
+    }
+
+    function test_unstake_deactivates() public {
+        vm.prank(verifier);
+        latch.unstakeVerifier(MIN_VERIFIER_STAKE);
+        assertFalse(latch.isActiveVerifier(verifier));
+        assertEq(latch.verifierStake(verifier), 0);
+        _assertSolvent();
+    }
+
+    function test_unstake_revertsWhileVerdictPending() public {
+        _toUnderVerification(true); // verdict posted -> stake locked
+        assertEq(latch.pendingVerdicts(verifier), 1);
+        vm.prank(verifier);
+        vm.expectRevert(LatchJob.StakeLocked.selector);
+        latch.unstakeVerifier(MIN_VERIFIER_STAKE);
+    }
+
+    function test_pendingVerdict_releasedOnFinalize() public {
+        uint256 jobId = _toUnderVerification(true);
+        assertEq(latch.pendingVerdicts(verifier), 1);
+        vm.warp(block.timestamp + CHALLENGE_WINDOW);
+        latch.finalize(jobId);
+        assertEq(latch.pendingVerdicts(verifier), 0);
+        vm.prank(verifier); // now unlocked
+        latch.unstakeVerifier(MIN_VERIFIER_STAKE);
+    }
+
+    function test_createJob_revertsIfVerifierUnstaked() public {
+        vm.prank(verifier);
+        latch.unstakeVerifier(MIN_VERIFIER_STAKE);
+        vm.prank(buyer);
+        vm.expectRevert(LatchJob.VerifierNotActive.selector);
+        latch.createJob(provider, verifier, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
+    }
+
+    function test_setVerifierParams_revertsZeroQuorum() public {
+        vm.prank(owner);
+        vm.expectRevert(LatchJob.InvalidQuorum.selector);
+        latch.setVerifierParams(MIN_VERIFIER_STAKE, SLASH_PER_VERDICT, 0);
     }
 }

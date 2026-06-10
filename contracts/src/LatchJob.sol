@@ -99,8 +99,26 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
 
     mapping(uint256 jobId => Job) private _jobs;
 
-    /// @notice Registered verifier keys allowed to sign verdicts (the AVS seam).
-    mapping(address verifier => bool) public isVerifier;
+    /// @notice Verifier stake, denominated in the escrow token. A verifier is *active* (allowed
+    ///         to sign verdicts) iff its stake is at least {minVerifierStake}. This is the staked
+    ///         verifier set: skin in the game, slashable on a proven-wrong verdict.
+    mapping(address verifier => uint256) public verifierStake;
+
+    /// @notice Total verifier stake held by the contract (part of the solvency invariant).
+    uint256 public totalVerifierStake;
+
+    /// @notice Count of unsettled verdicts a verifier has signed. Stake is locked while > 0, so a
+    ///         verifier cannot sign a verdict and then unstake to dodge slashing.
+    mapping(address verifier => uint256) public pendingVerdicts;
+
+    /// @notice Minimum stake to be an active verifier (0 = no active verifiers; must be set).
+    uint256 public minVerifierStake;
+
+    /// @notice Stake slashed from each signer of a verdict that a dispute overturns.
+    uint256 public slashPerVerdict;
+
+    /// @notice Verifier signatures required to record a verdict (k-of-n). Defaults to 1.
+    uint256 public verdictQuorum;
 
     /// @notice Final arbiter for challenged jobs (v0: a multisig; later a staked juror set).
     address public disputeResolver;
@@ -151,8 +169,13 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     event JobSettled(uint256 indexed jobId, bool pass, uint256 providerProceeds, uint256 fee, bytes32 reasonHash);
     event JobTimedOut(uint256 indexed jobId, State fromState);
 
+    // verifier staking
+    event VerifierStaked(address indexed verifier, uint256 amount, uint256 totalStake);
+    event VerifierUnstaked(address indexed verifier, uint256 amount, uint256 totalStake);
+    event VerifierSlashed(uint256 indexed jobId, address indexed verifier, uint256 amount, address indexed beneficiary);
+    event VerifierParamsSet(uint256 minStake, uint256 slashPerVerdict, uint256 quorum);
+
     // config events
-    event VerifierSet(address indexed verifier, bool allowed);
     event DisputeResolverSet(address indexed resolver);
     event FeeRecipientSet(address indexed recipient);
     event ProtocolFeeSet(uint16 bps);
@@ -171,7 +194,9 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     error NotBuyer();
     error NotProvider();
     error NotDisputeResolver();
-    error VerifierNotRegistered();
+    error VerifierNotActive();
+    error StakeLocked();
+    error InvalidQuorum();
     error InvalidVerifierSignature();
     error VerdictExpired();
     error DeadlinePassed();
@@ -206,6 +231,9 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         defaultProtocolFeeBps = defaultProtocolFeeBps_;
         challengeBondAmount = challengeBondAmount_;
         verdictTimeout = verdictTimeout_;
+        verdictQuorum = 1;
+        // minVerifierStake stays 0 until setVerifierParams is called, so the owner must explicitly
+        // open the verifier set (no verifier is active while minVerifierStake == 0).
     }
 
     // ---------------------------------------------------------------------
@@ -236,7 +264,7 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         if (provider == address(0) || verifier == address(0)) revert ZeroAddress();
         if (provider == msg.sender) revert NotJobParty();
         if (amount == 0) revert InvalidAmount();
-        if (!isVerifier[verifier]) revert VerifierNotRegistered();
+        if (!isActiveVerifier(verifier)) revert VerifierNotActive();
         if (submissionDeadline <= block.timestamp) revert DeadlinePassed();
         if (challengeWindow < MIN_CHALLENGE_WINDOW || challengeWindow > MAX_CHALLENGE_WINDOW) {
             revert InvalidChallengeWindow();
@@ -345,13 +373,16 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
             abi.encode(VERDICT_TYPEHASH, jobId, pass, score, reasonHash, keccak256(bytes(evidenceURI)), deadline)
         );
         address signer = ECDSA.recover(_hashTypedDataV4(structHash), verifierSig);
-        if (signer != j.verifier || !isVerifier[signer]) revert InvalidVerifierSignature();
+        if (signer != j.verifier || !isActiveVerifier(signer)) revert InvalidVerifierSignature();
 
         j.verdictPass = pass;
         j.verdictScore = score;
         j.reasonHash = reasonHash;
         j.verdictTime = uint64(block.timestamp);
         j.state = State.UnderVerification;
+
+        // Lock the verifier's stake until this verdict settles, so it cannot unstake to dodge a slash.
+        pendingVerdicts[signer] += 1;
 
         emit VerdictSubmitted(jobId, pass, score, reasonHash, evidenceURI, signer);
     }
@@ -364,6 +395,7 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
 
         bool pass = j.verdictPass;
         _settle(jobId, j, pass);
+        _resolveVerdictStake(jobId, j, false, address(0)); // unchallenged verdict: unlock, no slash
         _writeReputationAndValidation(j, pass); // external call last (CEI)
     }
 
@@ -399,8 +431,8 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     /// @notice Resolve a disputed job. Settles per `finalPass`, then distributes the challenger
     ///         bond: returned if the challenge succeeded (verdict overturned), otherwise slashed
     ///         to the counterparty that the upheld verdict favors.
-    /// @dev v0 has no verifier slashing (single trusted key); an overturned verdict is the seam
-    ///      for staked-verifier slashing under the AVS trajectory.
+    /// @dev An overturned verdict slashes the verifier's staked collateral to the wronged party;
+    ///      an upheld verdict simply unlocks the stake.
     function resolveDispute(uint256 jobId, bool finalPass) external nonReentrant onlyDisputeResolver {
         Job storage j = _jobs[jobId];
         _expectState(j, State.Disputed);
@@ -421,6 +453,9 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
                 _credit(challenger, cBond);
             }
         }
+
+        // Slash the verifier's stake on an overturned verdict; just unlock it if upheld.
+        _resolveVerdictStake(jobId, j, !upheld, finalPass ? j.provider : j.buyer);
 
         emit DisputeResolved(jobId, finalPass, upheld, challenger);
         _writeReputationAndValidation(j, finalPass); // external call last (CEI)
@@ -472,6 +507,43 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     }
 
     // ---------------------------------------------------------------------
+    // Verifier staking (the staked verifier set)
+    // ---------------------------------------------------------------------
+
+    /// @notice A verifier is active (eligible to sign verdicts) iff it has staked at least
+    ///         {minVerifierStake}. minVerifierStake == 0 means the set is closed.
+    function isActiveVerifier(address verifier) public view returns (bool) {
+        return minVerifierStake > 0 && verifierStake[verifier] >= minVerifierStake;
+    }
+
+    /// @notice Stake the escrow token to join the verifier set. Requires a prior ERC-20 approval.
+    function stakeVerifier(uint256 amount) external nonReentrant {
+        if (amount == 0) revert InvalidAmount();
+        // Effects before interaction; a failed/short transfer reverts the whole tx.
+        verifierStake[msg.sender] += amount;
+        totalVerifierStake += amount;
+
+        uint256 balanceBefore = token.balanceOf(address(this));
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        if (token.balanceOf(address(this)) - balanceBefore != amount) revert FundingAmountMismatch();
+
+        emit VerifierStaked(msg.sender, amount, verifierStake[msg.sender]);
+    }
+
+    /// @notice Withdraw stake. Blocked while the verifier has any unsettled verdict (no dodging slashes).
+    function unstakeVerifier(uint256 amount) external nonReentrant {
+        if (pendingVerdicts[msg.sender] != 0) revert StakeLocked();
+        uint256 staked = verifierStake[msg.sender];
+        if (amount == 0 || amount > staked) revert InvalidAmount();
+
+        verifierStake[msg.sender] = staked - amount;
+        totalVerifierStake -= amount;
+        token.safeTransfer(msg.sender, amount);
+
+        emit VerifierUnstaked(msg.sender, amount, verifierStake[msg.sender]);
+    }
+
+    // ---------------------------------------------------------------------
     // Internal settlement
     // ---------------------------------------------------------------------
 
@@ -519,6 +591,23 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         if (address(reputationRegistry) != address(0)) {
             try reputationRegistry.giveFeedback(agentId, pass ? 100 : 0, j.reasonHash) {} catch {}
         }
+    }
+
+    /// @dev Settle the verifier's locked stake for a job: always unlock one pending verdict, and
+    ///      if `slash` is set, move {slashPerVerdict} (capped at its stake) to `beneficiary`.
+    function _resolveVerdictStake(uint256 jobId, Job storage j, bool slash, address beneficiary) internal {
+        address verifier = j.verifier;
+        if (pendingVerdicts[verifier] > 0) pendingVerdicts[verifier] -= 1;
+        if (!slash || slashPerVerdict == 0) return;
+
+        uint256 staked = verifierStake[verifier];
+        uint256 amount = staked < slashPerVerdict ? staked : slashPerVerdict;
+        if (amount == 0) return;
+
+        verifierStake[verifier] = staked - amount;
+        totalVerifierStake -= amount;
+        _credit(beneficiary, amount);
+        emit VerifierSlashed(jobId, verifier, amount, beneficiary);
     }
 
     /// @dev BondModule payout hook.
@@ -573,10 +662,14 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     // Admin (owner) — config + the verifier/resolver/registry seams
     // ---------------------------------------------------------------------
 
-    function setVerifier(address verifier, bool allowed) external onlyOwner {
-        if (verifier == address(0)) revert ZeroAddress();
-        isVerifier[verifier] = allowed;
-        emit VerifierSet(verifier, allowed);
+    /// @notice Configure the verifier set: minimum stake to be active, stake slashed per overturned
+    ///         verdict, and the signature quorum required to record a verdict.
+    function setVerifierParams(uint256 minStake, uint256 slashAmount, uint256 quorum) external onlyOwner {
+        if (quorum == 0) revert InvalidQuorum();
+        minVerifierStake = minStake;
+        slashPerVerdict = slashAmount;
+        verdictQuorum = quorum;
+        emit VerifierParamsSet(minStake, slashAmount, quorum);
     }
 
     function setDisputeResolver(address resolver) external onlyOwner {

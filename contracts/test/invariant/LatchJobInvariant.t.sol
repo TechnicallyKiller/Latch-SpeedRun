@@ -21,7 +21,7 @@ contract LatchJobInvariantTest is LatchTestBase {
     function invariant_solvency() public view {
         assertGe(
             usdc.balanceOf(address(latch)),
-            latch.totalEscrowed() + latch.totalBondsLocked() + latch.totalWithdrawable(),
+            latch.totalEscrowed() + latch.totalBondsLocked() + latch.totalWithdrawable() + latch.totalVerifierStake(),
             "insolvent"
         );
     }

@@ -50,6 +50,7 @@ const BOND: u128 = 100_000_000; // 100 USDC
 const CHALLENGE_BOND: u128 = 50_000_000;
 const FEE_BPS: u16 = 100; // 1%
 const WINDOW: u32 = 60;
+const VERIFIER_STAKE: u128 = 1_000;
 
 // Standard anvil/hardhat deterministic test keys (public; local only).
 const KEY_OWNER: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
@@ -167,7 +168,19 @@ async fn run_full_loop(port: u16, honest: bool) {
     // Fund actors and register the verifier.
     usdc.mint(buyer_addr, U256::from(AMOUNT)).send().await.unwrap().get_receipt().await.unwrap();
     usdc.mint(provider_addr, U256::from(BOND)).send().await.unwrap().get_receipt().await.unwrap();
-    latch.setVerifier(verifier_addr, true).from(owner.address()).send().await.unwrap().get_receipt().await.unwrap();
+    latch
+        .setVerifierParams(U256::from(VERIFIER_STAKE), U256::from(VERIFIER_STAKE), U256::from(1))
+        .from(owner.address())
+        .send()
+        .await
+        .unwrap()
+        .get_receipt()
+        .await
+        .unwrap();
+    // verifier stakes to become active
+    usdc.mint(verifier_addr, U256::from(VERIFIER_STAKE)).send().await.unwrap().get_receipt().await.unwrap();
+    usdc.approve(latch_addr, U256::from(VERIFIER_STAKE)).from(verifier_addr).send().await.unwrap().get_receipt().await.unwrap();
+    latch.stakeVerifier(U256::from(VERIFIER_STAKE)).from(verifier_addr).send().await.unwrap().get_receipt().await.unwrap();
 
     // Policy: ground truth with an honest deliverable (PASS path).
     let sample = vec![

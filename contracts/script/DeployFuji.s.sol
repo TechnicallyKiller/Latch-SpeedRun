@@ -17,6 +17,11 @@ contract DeployFuji is Script {
         uint256 challengeBond = vm.envUint("CHALLENGE_BOND");
         address deployer = vm.addr(deployerPk);
 
+        // Verifier-set params (defaults keep testnet staking tiny; verifiers self-stake afterward).
+        uint256 minStake = vm.envOr("MIN_VERIFIER_STAKE", uint256(1000));
+        uint256 slashAmount = vm.envOr("SLASH_PER_VERDICT", uint256(1000));
+        uint256 quorum = vm.envOr("VERDICT_QUORUM", uint256(1));
+
         vm.startBroadcast(deployerPk);
         LatchJob latch = new LatchJob(
             IERC20(usdc),
@@ -27,7 +32,7 @@ contract DeployFuji is Script {
             challengeBond,
             1 days // verdictTimeout
         );
-        latch.setVerifier(verifier, true);
+        latch.setVerifierParams(minStake, slashAmount, quorum);
         vm.stopBroadcast();
 
         console2.log("LATCHJOB_ADDRESS=%s", address(latch));

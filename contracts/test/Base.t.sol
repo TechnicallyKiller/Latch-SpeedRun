@@ -29,6 +29,8 @@ abstract contract LatchTestBase is Test {
     uint16 internal constant FEE_BPS = 100; // 1%
     uint64 internal constant VERDICT_TIMEOUT = 1 days;
     uint32 internal constant CHALLENGE_WINDOW = 1 hours;
+    uint256 internal constant MIN_VERIFIER_STAKE = 1_000e6;
+    uint256 internal constant SLASH_PER_VERDICT = 1_000e6;
 
     bytes32 internal constant RECEIVE_TYPEHASH = keccak256(
         "ReceiveWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
@@ -50,10 +52,17 @@ abstract contract LatchTestBase is Test {
         latch = new LatchJob(usdc, owner, feeRecipient, disputeResolver, FEE_BPS, CHALLENGE_BOND, VERDICT_TIMEOUT);
 
         vm.prank(owner);
-        latch.setVerifier(verifier, true);
+        latch.setVerifierParams(MIN_VERIFIER_STAKE, SLASH_PER_VERDICT, 1);
 
         usdc.mint(buyer, 1_000_000e6);
         usdc.mint(provider, 1_000_000e6);
+
+        // The verifier stakes to become active.
+        usdc.mint(verifier, MIN_VERIFIER_STAKE);
+        vm.startPrank(verifier);
+        usdc.approve(address(latch), MIN_VERIFIER_STAKE);
+        latch.stakeVerifier(MIN_VERIFIER_STAKE);
+        vm.stopPrank();
     }
 
     // ---------------------------------------------------------------------
@@ -161,8 +170,8 @@ abstract contract LatchTestBase is Test {
     function _assertSolvent() internal view {
         assertGe(
             usdc.balanceOf(address(latch)),
-            latch.totalEscrowed() + latch.totalBondsLocked() + latch.totalWithdrawable(),
-            "insolvent: balance < escrow + bonds + withdrawable"
+            latch.totalEscrowed() + latch.totalBondsLocked() + latch.totalWithdrawable() + latch.totalVerifierStake(),
+            "insolvent: balance < escrow + bonds + withdrawable + verifierStake"
         );
     }
 }
