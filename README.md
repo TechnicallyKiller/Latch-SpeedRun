@@ -40,17 +40,72 @@ Four layers:
    fund via x402, and settle.
 4. **Dashboard** (`web/`, React). A live agent-commerce explorer reading
    on-chain state and events: jobs, verdicts, evidence, reputation, the
-   challenge window, and settlement.
+   challenge window, and settlement. Includes a dedicated **business model**
+   page explaining how the protocol and the verifier network earn.
 
 ## Trust model
 
-v0 runs a single registered verifier key and a multisig dispute resolver. The
-verdict and its evidence are public, and a challenge window plus dispute path
-bound the trust. The designed trajectory replaces the single key with a staked
-verifier set (an AVS with slashing) and the multisig with staked jurors; the
-verifier and resolver are swappable addresses so this is a drop-in, not a
-rewrite. Bonds are accounted in a module designed to be vaultized (ERC-4626)
-later.
+Verifiers must stake the escrow token to be active. A verdict is not recorded
+until a quorum (k-of-n) of distinct staked verifiers co-sign it; their stake
+locks while the verdict is unsettled, and an overturned dispute slashes every
+signer to the wronged party. Because verification is deterministic, honest
+verifiers produce byte-identical verdicts and co-sign one payload — and a
+disagreement is itself evidence of fault, reproducible from the public evidence.
+The dispute resolver is a multisig in v0 (designed to become staked jurors).
+Bonds are accounted in a module designed to be vaultized (ERC-4626) later. This
+turns "who checks the checker?" from "trust us" into "a staked set that is
+financially punished for lying, and cannot unstake to escape it."
+
+## Business model
+
+Latch is the trust-and-settlement rail for the agent economy: we take a small
+cut of every transaction we make safe, and we run the staked network that
+decides what "safe" means. Money is in throughput, not margin — the take-rate
+stays low because agent payments are small and price-sensitive, so the value is
+in the total volume of agent commerce settled through Latch.
+
+Three revenue lines, nearest-to-furthest cash:
+
+1. **Hosted verification (SaaS) — nearest revenue.** The verifier is the IP. Sell
+   it directly: "you run agents, we run the referee." Per-verification pricing or
+   a subscription, plus custom policy authoring for enterprises (verify a
+   dataset's quality, a model's output, a code deliverable). Earns money before a
+   large agent economy exists, because teams running agent fleets need it today.
+2. **Protocol take-rate on settled volume — the scale play.** A protocol fee on
+   every successful release (the on-chain fee primitive already exists). Small
+   per-job, compounding as autonomous agent commerce grows. Comparables: Stripe
+   (~2.9%/tx, payment only), Upwork/Escrow.com (5–20%, human escrow + dispute) —
+   Latch automates the "was the work correct?" judgment for agents, with no human.
+3. **The staked verifier network — long-term value capture.** Oracle-network
+   economics (think Chainlink, or an EigenLayer-style AVS). The network is the
+   business: it produces trust and charges for it, with a reinforcing loop —
+   more verifiers, more trust, more buyers, more fees, more verifiers — and
+   reputation data (ERC-8004) accruing to the network makes agents sticky.
+
+How the verifiers earn (the network's incentive design): a portion of each
+settled job's protocol fee is paid to the quorum that signed the verdict, split
+by participation. A verifier's economics are **verification fees + yield on
+stake − operating cost − slashing risk**. Honest, competent operators profit;
+lazy or dishonest ones are slashed and exit. (Implementation status: the on-chain
+fee primitive and the staking/slashing are built; the fee-to-verifier split is
+the designed incentive, not yet coded — today the fee accrues to the protocol.)
+
+Who pays, and why it is rational:
+
+- **Buyers** pay because the fee is cheap insurance against paying full price for
+  garbage — trivially worth it versus the downside.
+- **Honest providers** want it because verifiable correctness lets them beat
+  cheaper scammers; it creates a market that rewards quality.
+
+Honest risks: agent-to-agent commerce at scale is forming, not formed (x402 /
+ERC-8004 / ERC-8183 are early), so the take-rate play is a bet on that market
+emerging — the SaaS line funds the company while it matures. A token is optional
+and not assumed; the fee + SaaS model stands without one.
+
+Phasing: (1) ecosystem grants fund the build and prove the loop on-chain;
+(2) hosted verification SaaS for early cash and IP validation; (3) protocol
+take-rate as agent volume grows; (4) open the staked verifier network as the
+trust rail for the broader agent economy.
 
 ## What is real vs designed-for
 
@@ -145,9 +200,13 @@ Verified against official sources; addresses are not assumed.
 
 The contracts, the verifier, and the full verify-then-settle loop are complete and
 green, proven end-to-end on a local anvil fork and live on Avalanche Fuji for both
-the pass and fail outcomes (real USDC, IPFS-pinned evidence). Next is the staked
-verifier committee, the x402 HTTP layer, the ERC-8004 registry wiring, the agents,
-and the dashboard.
+the pass and fail outcomes (real USDC, IPFS-pinned evidence). The **staked verifier
+committee** (stake to verify, k-of-n quorum, slash every signer on an overturned
+verdict) is built and tested — 55 Solidity tests, the cross-language digest vector,
+and the anvil e2e all pass — and is being readied for a live Fuji deployment.
+
+Next: the x402 HTTP layer, the ERC-8004 registry wiring, the autonomous agents, and
+the dashboard (including the dedicated business-model page).
 
 ## License
 
