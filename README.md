@@ -169,10 +169,11 @@ the entire verify-then-settle loop for both the pass and fail outcomes.
 
 ## Live on Fuji
 
-`LatchJob` is deployed on Avalanche Fuji at
-[`0xD7EeD2a64762A7038d64886882161bA1b1EfC074`](https://testnet.snowtrace.io/address/0xD7EeD2a64762A7038d64886882161bA1b1EfC074),
-running against the real USDC. The demo runner drives the full loop on Fuji with
-real USDC and IPFS-pinned evidence, printing a Snowtrace link per transaction:
+The staked-committee `LatchJob` is deployed on Avalanche Fuji at
+[`0xa5cA9c7920F22E1104215C430227756dEBBb2a09`](https://testnet.snowtrace.io/address/0xa5cA9c7920F22E1104215C430227756dEBBb2a09),
+running against the real USDC, with the verifier staked on-chain. The demo runner
+drives the full loop on Fuji with real USDC and IPFS-pinned evidence, printing a
+Snowtrace link per transaction (including the verifier's stake):
 
 ```
 # .env at the repo root holds the RPC, keys, deployed address, and Pinata token
