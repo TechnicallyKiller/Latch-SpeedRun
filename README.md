@@ -62,13 +62,17 @@ Real and tested now:
 - The verifier policy engine (JSON_SCHEMA, GROUND_TRUTH_SAMPLE with enforced
   commit-reveal), EIP-712 verdict signing, the content-addressed evidence store,
   and the on-chain submission code. A cross-language golden-vector test proves the
-  Rust verifier and the Solidity contract compute identical EIP-712 digests, so a
-  Rust-signed verdict is accepted by `submitVerdict`.
+  Rust verifier and the Solidity contract compute identical EIP-712 digests.
+- The full verify-then-settle loop, live on a local anvil fork: deploy, fund via
+  a Rust-signed EIP-3009 authorization, accept, submit, the Rust verifier signs
+  and submits the verdict on-chain, finalize, and withdraw. Both outcomes are
+  asserted end-to-end — an honest deliverable pays the provider, and well-formed
+  garbage refunds the buyer and slashes the provider's bond.
 
 Designed-for, not yet built:
 
-- The live verify-then-settle loop end-to-end on a chain (local fork, then Fuji),
-  the x402 HTTP layer, ERC-8004 registry wiring, agents, and dashboard.
+- The same loop on Fuji, the x402 HTTP layer, ERC-8004 registry wiring, agents,
+  and dashboard.
 - IPFS-backed evidence (the local store implements the same interface today).
 - Staked verifier set / staked jurors, ERC-4626 bond vault, confidential
   settlement via Avalanche eERC.
@@ -101,8 +105,12 @@ Rust (1.85+) is required for the verifier.
 
 ```
 cd verifier
-cargo test            # policy engine, signing, cross-language digest vector
+cargo test                          # policy engine, signing, cross-language digest vector
+cargo test --test e2e_anvil -- --ignored   # live full loop (needs anvil on PATH)
 ```
+
+The `e2e_anvil` test spawns a local anvil node, deploys the contracts, and runs
+the entire verify-then-settle loop for both the pass and fail outcomes.
 
 ## Confirmed on-chain facts
 
@@ -121,10 +129,10 @@ Verified against official sources; addresses are not assumed.
 
 ## Status
 
-The contracts and the verifier core are complete and green, with the Rust and
-Solidity sides proven to agree on the EIP-712 verdict digest. Next is the live
-verify-then-settle loop (x402 funding and on-chain submission) end-to-end on a
-local fork.
+The contracts, the verifier, and the full verify-then-settle loop are complete and
+green, proven end-to-end on a local anvil fork for both the pass and fail outcomes.
+Next is the same loop on Fuji, the x402 HTTP layer, the ERC-8004 registry wiring,
+the agents, and the dashboard.
 
 ## License
 
