@@ -33,6 +33,7 @@ sol! {
     #[sol(rpc)]
     interface IERC20 {
         function balanceOf(address account) external view returns (uint256);
+        function approve(address spender, uint256 amount) external returns (bool);
     }
 
     struct ReceiveWithAuthorization {
@@ -130,6 +131,14 @@ async fn main() -> Res<()> {
     println!("\n=== Latch Fuji demo: {} ===", if honest { "HONEST (expect PASS)" } else { "ADVERSARIAL (expect FAIL)" });
     println!("LatchJob: https://testnet.snowtrace.io/address/{latch_addr:#x}\n");
 
+    // Ensure the verifier is an active (staked) member of the set (stake once; reused after).
+    if !latch.isActiveVerifier(verifier_addr).call().await? {
+        let min = latch.minVerifierStake().call().await?;
+        token.approve(latch_addr, min).from(verifier_addr).send().await?.get_receipt().await?;
+        let r = latch.stakeVerifier(min).from(verifier_addr).send().await?.get_receipt().await?;
+        tx_link("stakeVerifier", r.transaction_hash);
+    }
+
     // Policy: same answer key; the deliverable is correct (honest) or well-formed-but-wrong (garbage).
     let sample = vec![
         GroundTruthItem { id: "q1".into(), expected: json!("cat") },
@@ -149,7 +158,7 @@ async fn main() -> Res<()> {
 
     // 1) createJob (buyer)
     let r = latch
-        .createJob(provider_addr, verifier_addr, amount, bond, commitment, U256::ZERO, now + 86_400, window)
+        .createJob(provider_addr, amount, bond, commitment, U256::ZERO, now + 86_400, window)
         .from(buyer_addr)
         .send()
         .await?
@@ -195,7 +204,7 @@ async fn main() -> Res<()> {
         deadline: U256::from(now + 3600),
     };
     let signed = sign_verdict(&verifier, &latch_domain(chain_id, latch_addr), verdict)?;
-    let vh = submit_verdict(&conn, latch_addr, &signed).await?;
+    let vh = submit_verdict(&conn, latch_addr, &signed.verdict, &[signed.signature.clone()]).await?;
     tx_link("submitVerdict", vh);
 
     // 6) wait out the challenge window, then finalize (relayed by deployer)

@@ -119,11 +119,16 @@ abstract contract LatchTestBase is Test {
     // Lifecycle helpers
     // ---------------------------------------------------------------------
 
+    /// @dev Wrap a single signature in the bytes[] expected by submitVerdict (quorum 1).
+    function _one(bytes memory sig) internal pure returns (bytes[] memory arr) {
+        arr = new bytes[](1);
+        arr[0] = sig;
+    }
+
     function _createJob() internal returns (uint256 jobId) {
         vm.prank(buyer);
         jobId = latch.createJob(
             provider,
-            verifier,
             AMOUNT,
             PROVIDER_BOND,
             keccak256("policy"),
@@ -154,7 +159,7 @@ abstract contract LatchTestBase is Test {
     function _postVerdict(uint256 jobId, bool pass) internal {
         uint256 deadline = block.timestamp + 1 hours;
         bytes memory sig = _signVerdict(verifierPk, jobId, pass, pass ? 95 : 10, keccak256("reason"), "ipfs://evidence", deadline);
-        latch.submitVerdict(jobId, pass, pass ? 95 : 10, keccak256("reason"), "ipfs://evidence", deadline, sig);
+        latch.submitVerdict(jobId, pass, pass ? 95 : 10, keccak256("reason"), "ipfs://evidence", deadline, _one(sig));
     }
 
     /// @dev Drive a job to UnderVerification with the given verdict.

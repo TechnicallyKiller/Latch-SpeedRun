@@ -47,7 +47,6 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     struct Job {
         address buyer;
         address provider;
-        address verifier; // key authorized to sign this job's verdict
         address challenger; // set when challenged
         uint256 amount; // escrowed USDC
         uint256 providerBond; // bond locked when provider accepts
@@ -64,6 +63,7 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         uint32 challengeWindow; // seconds the optimistic window stays open
         bool verdictPass; // verdict outcome
         State state;
+        address[] verdictSigners; // the staked verifiers who co-signed the recorded verdict
     }
 
     // ---------------------------------------------------------------------
@@ -148,7 +148,6 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         uint256 indexed jobId,
         address indexed buyer,
         address indexed provider,
-        address verifier,
         uint256 amount,
         uint256 providerBond,
         bytes32 policyCommitment
@@ -162,7 +161,7 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         uint256 score,
         bytes32 reasonHash,
         string evidenceURI,
-        address indexed verifier
+        uint256 signerCount
     );
     event JobChallenged(uint256 indexed jobId, address indexed challenger, uint256 bond);
     event DisputeResolved(uint256 indexed jobId, bool finalPass, bool verdictUpheld, address indexed challenger);
@@ -194,10 +193,11 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     error NotBuyer();
     error NotProvider();
     error NotDisputeResolver();
-    error VerifierNotActive();
     error StakeLocked();
     error InvalidQuorum();
     error InvalidVerifierSignature();
+    error NotEnoughSignatures();
+    error DuplicateSigner();
     error VerdictExpired();
     error DeadlinePassed();
     error InvalidChallengeWindow();
@@ -253,7 +253,6 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     ///         (agents discover via ERC-8004); the chosen provider is bound here.
     function createJob(
         address provider,
-        address verifier,
         uint256 amount,
         uint256 providerBond,
         bytes32 policyCommitment,
@@ -261,10 +260,9 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         uint64 submissionDeadline,
         uint32 challengeWindow
     ) external returns (uint256 jobId) {
-        if (provider == address(0) || verifier == address(0)) revert ZeroAddress();
+        if (provider == address(0)) revert ZeroAddress();
         if (provider == msg.sender) revert NotJobParty();
         if (amount == 0) revert InvalidAmount();
-        if (!isActiveVerifier(verifier)) revert VerifierNotActive();
         if (submissionDeadline <= block.timestamp) revert DeadlinePassed();
         if (challengeWindow < MIN_CHALLENGE_WINDOW || challengeWindow > MAX_CHALLENGE_WINDOW) {
             revert InvalidChallengeWindow();
@@ -274,7 +272,6 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         Job storage j = _jobs[jobId];
         j.buyer = msg.sender;
         j.provider = provider;
-        j.verifier = verifier;
         j.amount = amount;
         j.providerBond = providerBond;
         j.providerAgentId = providerAgentId;
@@ -284,7 +281,7 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         j.challengeWindow = challengeWindow;
         j.state = State.Created;
 
-        emit JobCreated(jobId, msg.sender, provider, verifier, amount, providerBond, policyCommitment);
+        emit JobCreated(jobId, msg.sender, provider, amount, providerBond, policyCommitment);
     }
 
     /// @notice Fund the escrow by redeeming the buyer's EIP-3009 authorization. The signed nonce
@@ -356,6 +353,10 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     /// @notice Record a verifier's signed correctness verdict and open the challenge window.
     /// @dev Authorization is the EIP-712 signature (relayer-friendly); only a valid signature
     ///      from the job's registered verifier advances the job to UnderVerification.
+    /// @dev Records a verdict co-signed by a quorum of the staked verifier set. Because
+    ///      verification is deterministic, honest verifiers produce byte-identical verdicts and
+    ///      sign the same EIP-712 digest, so their signatures are simply collected here. Each
+    ///      signer must be a distinct active (staked) verifier; their stake locks until settlement.
     function submitVerdict(
         uint256 jobId,
         bool pass,
@@ -363,17 +364,26 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         bytes32 reasonHash,
         string calldata evidenceURI,
         uint256 deadline,
-        bytes calldata verifierSig
+        bytes[] calldata sigs
     ) external {
         Job storage j = _jobs[jobId];
         _expectState(j, State.Submitted);
         if (block.timestamp > deadline) revert VerdictExpired();
+        if (sigs.length < verdictQuorum) revert NotEnoughSignatures();
 
-        bytes32 structHash = keccak256(
-            abi.encode(VERDICT_TYPEHASH, jobId, pass, score, reasonHash, keccak256(bytes(evidenceURI)), deadline)
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(abi.encode(VERDICT_TYPEHASH, jobId, pass, score, reasonHash, keccak256(bytes(evidenceURI)), deadline))
         );
-        address signer = ECDSA.recover(_hashTypedDataV4(structHash), verifierSig);
-        if (signer != j.verifier || !isActiveVerifier(signer)) revert InvalidVerifierSignature();
+
+        for (uint256 i = 0; i < sigs.length; i++) {
+            address signer = ECDSA.recover(digest, sigs[i]);
+            if (!isActiveVerifier(signer)) revert InvalidVerifierSignature();
+            for (uint256 k = 0; k < j.verdictSigners.length; k++) {
+                if (j.verdictSigners[k] == signer) revert DuplicateSigner();
+            }
+            j.verdictSigners.push(signer);
+            pendingVerdicts[signer] += 1; // lock stake until settled
+        }
 
         j.verdictPass = pass;
         j.verdictScore = score;
@@ -381,10 +391,7 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
         j.verdictTime = uint64(block.timestamp);
         j.state = State.UnderVerification;
 
-        // Lock the verifier's stake until this verdict settles, so it cannot unstake to dodge a slash.
-        pendingVerdicts[signer] += 1;
-
-        emit VerdictSubmitted(jobId, pass, score, reasonHash, evidenceURI, signer);
+        emit VerdictSubmitted(jobId, pass, score, reasonHash, evidenceURI, sigs.length);
     }
 
     /// @notice Optimistically finalize after the challenge window elapses with no challenge.
@@ -596,18 +603,22 @@ contract LatchJob is BondModule, Ownable, EIP712, ReentrancyGuard {
     /// @dev Settle the verifier's locked stake for a job: always unlock one pending verdict, and
     ///      if `slash` is set, move {slashPerVerdict} (capped at its stake) to `beneficiary`.
     function _resolveVerdictStake(uint256 jobId, Job storage j, bool slash, address beneficiary) internal {
-        address verifier = j.verifier;
-        if (pendingVerdicts[verifier] > 0) pendingVerdicts[verifier] -= 1;
-        if (!slash || slashPerVerdict == 0) return;
-
-        uint256 staked = verifierStake[verifier];
-        uint256 amount = staked < slashPerVerdict ? staked : slashPerVerdict;
-        if (amount == 0) return;
-
-        verifierStake[verifier] = staked - amount;
-        totalVerifierStake -= amount;
-        _credit(beneficiary, amount);
-        emit VerifierSlashed(jobId, verifier, amount, beneficiary);
+        address[] storage signers = j.verdictSigners;
+        uint256 n = signers.length;
+        for (uint256 i = 0; i < n; i++) {
+            address v = signers[i];
+            if (pendingVerdicts[v] > 0) pendingVerdicts[v] -= 1;
+            if (slash && slashPerVerdict > 0) {
+                uint256 staked = verifierStake[v];
+                uint256 amount = staked < slashPerVerdict ? staked : slashPerVerdict;
+                if (amount > 0) {
+                    verifierStake[v] = staked - amount;
+                    totalVerifierStake -= amount;
+                    _credit(beneficiary, amount);
+                    emit VerifierSlashed(jobId, v, amount, beneficiary);
+                }
+            }
+        }
     }
 
     /// @dev BondModule payout hook.

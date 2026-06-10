@@ -201,7 +201,7 @@ async fn run_full_loop(port: u16, honest: bool) {
 
     // 1) createJob (buyer). First job id is 1.
     latch
-        .createJob(provider_addr, verifier_addr, U256::from(AMOUNT), U256::from(BOND), commitment, U256::ZERO, now + 86_400, WINDOW)
+        .createJob(provider_addr, U256::from(AMOUNT), U256::from(BOND), commitment, U256::ZERO, now + 86_400, WINDOW)
         .from(buyer_addr)
         .send()
         .await
@@ -236,7 +236,7 @@ async fn run_full_loop(port: u16, honest: bool) {
     let store = LocalCas::new(std::env::temp_dir().join("latch-e2e"));
     let domain = latch_domain(CHAIN_ID, latch_addr);
     let signed = run_verification(&policy, &deliverable, commitment, job_id, U256::from(now + 3600), &store, &verifier, &domain).unwrap();
-    submit_verdict(&provider, latch_addr, &signed).await.unwrap();
+    submit_verdict(&provider, latch_addr, &signed.verdict, &[signed.signature.clone()]).await.unwrap();
 
     assert_eq!(latch.getJob(job_id).call().await.unwrap().state, 5, "UnderVerification");
 

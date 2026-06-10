@@ -16,7 +16,6 @@ contract LatchJobTest is LatchTestBase {
         LatchJob.Job memory j = latch.getJob(jobId);
         assertEq(j.buyer, buyer);
         assertEq(j.provider, provider);
-        assertEq(j.verifier, verifier);
         assertEq(j.amount, AMOUNT);
         assertEq(j.providerBond, PROVIDER_BOND);
         assertEq(j.protocolFeeBps, FEE_BPS);
@@ -24,34 +23,28 @@ contract LatchJobTest is LatchTestBase {
         assertEq(latch.jobCount(), 1);
     }
 
-    function test_createJob_revertsUnregisteredVerifier() public {
-        vm.prank(buyer);
-        vm.expectRevert(LatchJob.VerifierNotActive.selector);
-        latch.createJob(provider, makeAddr("rogue"), AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
-    }
-
     function test_createJob_revertsProviderIsBuyer() public {
         vm.prank(buyer);
         vm.expectRevert(LatchJob.NotJobParty.selector);
-        latch.createJob(buyer, verifier, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
+        latch.createJob(buyer, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
     }
 
     function test_createJob_revertsZeroAmount() public {
         vm.prank(buyer);
         vm.expectRevert(LatchJob.InvalidAmount.selector);
-        latch.createJob(provider, verifier, 0, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
+        latch.createJob(provider, 0, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
     }
 
     function test_createJob_revertsBadWindow() public {
         vm.prank(buyer);
         vm.expectRevert(LatchJob.InvalidChallengeWindow.selector);
-        latch.createJob(provider, verifier, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), 1);
+        latch.createJob(provider, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), 1);
     }
 
     function test_createJob_revertsPastDeadline() public {
         vm.prank(buyer);
         vm.expectRevert(LatchJob.DeadlinePassed.selector);
-        latch.createJob(provider, verifier, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp), CHALLENGE_WINDOW);
+        latch.createJob(provider, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp), CHALLENGE_WINDOW);
     }
 
     // ---------------------------------------------------------------------
@@ -144,7 +137,7 @@ contract LatchJobTest is LatchTestBase {
         // signed by buyer, not the registered verifier
         bytes memory sig = _signVerdict(buyerPk, jobId, true, 95, keccak256("r"), "ipfs://e", deadline);
         vm.expectRevert(LatchJob.InvalidVerifierSignature.selector);
-        latch.submitVerdict(jobId, true, 95, keccak256("r"), "ipfs://e", deadline, sig);
+        latch.submitVerdict(jobId, true, 95, keccak256("r"), "ipfs://e", deadline, _one(sig));
     }
 
     function test_submitVerdict_revertsExpired() public {
@@ -156,7 +149,7 @@ contract LatchJobTest is LatchTestBase {
         bytes memory sig = _signVerdict(verifierPk, jobId, true, 95, keccak256("r"), "ipfs://e", deadline);
         vm.warp(deadline + 1);
         vm.expectRevert(LatchJob.VerdictExpired.selector);
-        latch.submitVerdict(jobId, true, 95, keccak256("r"), "ipfs://e", deadline, sig);
+        latch.submitVerdict(jobId, true, 95, keccak256("r"), "ipfs://e", deadline, _one(sig));
     }
 
     function test_submitVerdict_revertsAfterVerifierUnstaked() public {
@@ -170,7 +163,7 @@ contract LatchJobTest is LatchTestBase {
         uint256 deadline = block.timestamp + 1 hours;
         bytes memory sig = _signVerdict(verifierPk, jobId, true, 95, keccak256("r"), "ipfs://e", deadline);
         vm.expectRevert(LatchJob.InvalidVerifierSignature.selector);
-        latch.submitVerdict(jobId, true, 95, keccak256("r"), "ipfs://e", deadline, sig);
+        latch.submitVerdict(jobId, true, 95, keccak256("r"), "ipfs://e", deadline, _one(sig));
     }
 
     // ---------------------------------------------------------------------
@@ -472,17 +465,111 @@ contract LatchJobTest is LatchTestBase {
         latch.unstakeVerifier(MIN_VERIFIER_STAKE);
     }
 
-    function test_createJob_revertsIfVerifierUnstaked() public {
-        vm.prank(verifier);
-        latch.unstakeVerifier(MIN_VERIFIER_STAKE);
-        vm.prank(buyer);
-        vm.expectRevert(LatchJob.VerifierNotActive.selector);
-        latch.createJob(provider, verifier, AMOUNT, PROVIDER_BOND, bytes32(0), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
-    }
-
     function test_setVerifierParams_revertsZeroQuorum() public {
         vm.prank(owner);
         vm.expectRevert(LatchJob.InvalidQuorum.selector);
         latch.setVerifierParams(MIN_VERIFIER_STAKE, SLASH_PER_VERDICT, 0);
+    }
+
+    // ---------------------------------------------------------------------
+    // k-of-n verifier quorum
+    // ---------------------------------------------------------------------
+
+    function _stakeFrom(uint256 pk) internal returns (address v) {
+        v = vm.addr(pk);
+        usdc.mint(v, MIN_VERIFIER_STAKE);
+        vm.startPrank(v);
+        usdc.approve(address(latch), MIN_VERIFIER_STAKE);
+        latch.stakeVerifier(MIN_VERIFIER_STAKE);
+        vm.stopPrank();
+    }
+
+    function _threeSigs(uint256 jobId, uint256 pkA, uint256 pkB, uint256 pkC, uint256 deadline)
+        internal
+        view
+        returns (bytes[] memory sigs)
+    {
+        sigs = new bytes[](3);
+        sigs[0] = _signVerdict(pkA, jobId, true, 95, keccak256("reason"), "ipfs://e", deadline);
+        sigs[1] = _signVerdict(pkB, jobId, true, 95, keccak256("reason"), "ipfs://e", deadline);
+        sigs[2] = _signVerdict(pkC, jobId, true, 95, keccak256("reason"), "ipfs://e", deadline);
+    }
+
+    function test_quorum_threeSignersSucceeds() public {
+        (, uint256 v2pk) = makeAddrAndKey("verifier2");
+        (, uint256 v3pk) = makeAddrAndKey("verifier3");
+        address v2 = _stakeFrom(v2pk);
+        address v3 = _stakeFrom(v3pk);
+        vm.prank(owner);
+        latch.setVerifierParams(MIN_VERIFIER_STAKE, SLASH_PER_VERDICT, 3);
+
+        uint256 jobId = _createJob();
+        _fund(jobId);
+        _accept(jobId);
+        _submit(jobId);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        latch.submitVerdict(jobId, true, 95, keccak256("reason"), "ipfs://e", deadline, _threeSigs(jobId, verifierPk, v2pk, v3pk, deadline));
+
+        LatchJob.Job memory j = latch.getJob(jobId);
+        assertEq(uint8(j.state), uint8(LatchJob.State.UnderVerification));
+        assertEq(j.verdictSigners.length, 3);
+        assertEq(latch.pendingVerdicts(verifier), 1);
+        assertEq(latch.pendingVerdicts(v2), 1);
+        assertEq(latch.pendingVerdicts(v3), 1);
+    }
+
+    function test_quorum_belowQuorumReverts() public {
+        vm.prank(owner);
+        latch.setVerifierParams(MIN_VERIFIER_STAKE, SLASH_PER_VERDICT, 2);
+        uint256 jobId = _createJob();
+        _fund(jobId);
+        _accept(jobId);
+        _submit(jobId);
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _signVerdict(verifierPk, jobId, true, 95, keccak256("reason"), "ipfs://e", deadline);
+        vm.expectRevert(LatchJob.NotEnoughSignatures.selector);
+        latch.submitVerdict(jobId, true, 95, keccak256("reason"), "ipfs://e", deadline, _one(sig));
+    }
+
+    function test_quorum_duplicateSignerReverts() public {
+        uint256 jobId = _createJob();
+        _fund(jobId);
+        _accept(jobId);
+        _submit(jobId);
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _signVerdict(verifierPk, jobId, true, 95, keccak256("reason"), "ipfs://e", deadline);
+        bytes[] memory sigs = new bytes[](2);
+        sigs[0] = sig;
+        sigs[1] = sig; // same signer twice
+        vm.expectRevert(LatchJob.DuplicateSigner.selector);
+        latch.submitVerdict(jobId, true, 95, keccak256("reason"), "ipfs://e", deadline, sigs);
+    }
+
+    function test_quorum_overturnSlashesAllSigners() public {
+        (, uint256 v2pk) = makeAddrAndKey("verifier2");
+        (, uint256 v3pk) = makeAddrAndKey("verifier3");
+        address v2 = _stakeFrom(v2pk);
+        address v3 = _stakeFrom(v3pk);
+        vm.prank(owner);
+        latch.setVerifierParams(MIN_VERIFIER_STAKE, SLASH_PER_VERDICT, 3);
+
+        uint256 jobId = _createJob();
+        _fund(jobId);
+        _accept(jobId);
+        _submit(jobId);
+        uint256 deadline = block.timestamp + 1 hours;
+        latch.submitVerdict(jobId, true, 95, keccak256("reason"), "ipfs://e", deadline, _threeSigs(jobId, verifierPk, v2pk, v3pk, deadline));
+
+        // buyer challenges, resolver overturns to FAIL -> all three verifiers slashed to the buyer
+        _challenge(jobId, buyer, buyerPk);
+        vm.prank(disputeResolver);
+        latch.resolveDispute(jobId, false);
+
+        assertEq(latch.verifierStake(verifier), MIN_VERIFIER_STAKE - SLASH_PER_VERDICT);
+        assertEq(latch.verifierStake(v2), MIN_VERIFIER_STAKE - SLASH_PER_VERDICT);
+        assertEq(latch.verifierStake(v3), MIN_VERIFIER_STAKE - SLASH_PER_VERDICT);
+        assertEq(latch.withdrawable(buyer), AMOUNT + PROVIDER_BOND + CHALLENGE_BOND + 3 * SLASH_PER_VERDICT);
+        _assertSolvent();
     }
 }

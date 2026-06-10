@@ -20,7 +20,7 @@ contract LatchJobFuzzTest is LatchTestBase {
 
         vm.prank(buyer);
         jobId = latch.createJob(
-            provider, verifier, amount, bond, keccak256("p"), 0, uint64(block.timestamp + 1 days), window
+            provider, amount, bond, keccak256("p"), 0, uint64(block.timestamp + 1 days), window
         );
         _fundAmt(jobId, amount);
         _acceptAmt(jobId, bond);
@@ -49,7 +49,7 @@ contract LatchJobFuzzTest is LatchTestBase {
         uint256 deadline = block.timestamp + 1 hours;
         uint256 score = pass ? 100 : 0;
         bytes memory sig = _signVerdict(verifierPk, jobId, pass, score, keccak256("r"), "ipfs://e", deadline);
-        latch.submitVerdict(jobId, pass, score, keccak256("r"), "ipfs://e", deadline, sig);
+        latch.submitVerdict(jobId, pass, score, keccak256("r"), "ipfs://e", deadline, _one(sig));
     }
 
     /// @dev PASS settlement: provider gets amount-fee+bond, feeRecipient gets fee, nothing leaks.
@@ -109,8 +109,8 @@ contract LatchJobFuzzTest is LatchTestBase {
         }
     }
 
-    /// @dev Only the registered verifier's signature can advance a job; any other key reverts.
-    function testFuzz_onlyVerifierSigAdvances(uint256 badPk) public {
+    /// @dev Only an active (staked) verifier's signature can advance a job; any other key reverts.
+    function testFuzz_onlyActiveVerifierSigAdvances(uint256 badPk) public {
         badPk = bound(badPk, 1, SECP256K1_N - 1);
         vm.assume(vm.addr(badPk) != verifier);
 
@@ -122,7 +122,7 @@ contract LatchJobFuzzTest is LatchTestBase {
         uint256 deadline = block.timestamp + 1 hours;
         bytes memory sig = _signVerdict(badPk, jobId, true, 100, keccak256("r"), "ipfs://e", deadline);
         vm.expectRevert(LatchJob.InvalidVerifierSignature.selector);
-        latch.submitVerdict(jobId, true, 100, keccak256("r"), "ipfs://e", deadline, sig);
+        latch.submitVerdict(jobId, true, 100, keccak256("r"), "ipfs://e", deadline, _one(sig));
     }
 
     /// @dev A funding authorization is bound to its jobId: a signature for one job cannot fund another.
@@ -131,8 +131,8 @@ contract LatchJobFuzzTest is LatchTestBase {
         usdc.mint(buyer, amount * 2);
 
         vm.startPrank(buyer);
-        uint256 jobA = latch.createJob(provider, verifier, amount, 0, keccak256("a"), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
-        uint256 jobB = latch.createJob(provider, verifier, amount, 0, keccak256("b"), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
+        uint256 jobA = latch.createJob(provider, amount, 0, keccak256("a"), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
+        uint256 jobB = latch.createJob(provider, amount, 0, keccak256("b"), 0, uint64(block.timestamp + 1 days), CHALLENGE_WINDOW);
         vm.stopPrank();
 
         // sign a funding authorization for jobA's nonce...

@@ -1,10 +1,10 @@
-//! On-chain verdict submission. Sends a signed verdict to `LatchJob.submitVerdict`, which the
-//! contract verifies against the job's registered verifier key and uses to open the challenge
-//! window. Only the `submitVerdict` selector is bound here so the production path stays
-//! independent of the Foundry build artifacts.
+//! On-chain verdict submission. Sends a verdict co-signed by a quorum of the staked verifier set
+//! to `LatchJob.submitVerdict`, which verifies each signature against the active verifiers and
+//! opens the challenge window. Only the `submitVerdict` selector is bound here so the production
+//! path stays independent of the Foundry build artifacts.
 
 use crate::error::VerifierError;
-use crate::verdict::SignedVerdict;
+use crate::verdict::Verdict;
 use alloy::primitives::{Address, Bytes, B256};
 use alloy::providers::Provider;
 use alloy::sol;
@@ -19,29 +19,31 @@ sol! {
             bytes32 reasonHash,
             string evidenceURI,
             uint256 deadline,
-            bytes verifierSig
+            bytes[] verifierSigs
         ) external;
     }
 }
 
-/// Submit a signed verdict to the LatchJob contract at `latch`, returning the transaction hash.
+/// Submit a verdict and its quorum of signatures (all over the same EIP-712 digest) to the
+/// LatchJob contract at `latch`, returning the transaction hash.
 pub async fn submit_verdict<P: Provider>(
     provider: P,
     latch: Address,
-    signed: &SignedVerdict,
+    verdict: &Verdict,
+    signatures: &[Vec<u8>],
 ) -> Result<B256, VerifierError> {
     let contract = ILatchJob::new(latch, provider);
-    let v = &signed.verdict;
+    let sigs: Vec<Bytes> = signatures.iter().map(|s| Bytes::from(s.clone())).collect();
 
     let pending = contract
         .submitVerdict(
-            v.jobId,
-            v.pass,
-            v.score,
-            v.reasonHash,
-            v.evidenceURI.clone(),
-            v.deadline,
-            Bytes::from(signed.signature.clone()),
+            verdict.jobId,
+            verdict.pass,
+            verdict.score,
+            verdict.reasonHash,
+            verdict.evidenceURI.clone(),
+            verdict.deadline,
+            sigs,
         )
         .send()
         .await

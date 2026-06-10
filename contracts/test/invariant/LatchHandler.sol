@@ -97,7 +97,7 @@ contract LatchHandler is Test {
         amount = bound(amount, 1, 1e12);
         bond = bound(bond, 0, 1e12);
         vm.prank(buyer);
-        try latch.createJob(provider, verifier, amount, bond, keccak256("p"), 0, uint64(block.timestamp + 1 days), uint32(1 hours))
+        try latch.createJob(provider, amount, bond, keccak256("p"), 0, uint64(block.timestamp + 1 days), uint32(1 hours))
         returns (uint256 id) {
             jobIds.push(id);
         } catch {}
@@ -134,8 +134,9 @@ contract LatchHandler is Test {
         if (!ok) return;
         LatchJob.Job memory j = latch.getJob(jobId);
         if (j.state != LatchJob.State.Submitted) return;
-        bytes memory sig = _signVerd(verifierPk, jobId, pass);
-        try latch.submitVerdict(jobId, pass, pass ? 100 : 0, keccak256("r"), "ipfs://e", block.timestamp + 1 hours, sig) {} catch {}
+        bytes[] memory sigs = new bytes[](1);
+        sigs[0] = _signVerd(verifierPk, jobId, pass);
+        try latch.submitVerdict(jobId, pass, pass ? 100 : 0, keccak256("r"), "ipfs://e", block.timestamp + 1 hours, sigs) {} catch {}
     }
 
     function warpTime(uint256 t) public {
