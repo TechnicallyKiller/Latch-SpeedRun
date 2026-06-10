@@ -58,13 +58,18 @@ Real and tested now:
 
 - `LatchJob` full lifecycle, EIP-3009 funding, EIP-712 verdict intake,
   optimistic finalize, challenge/dispute, bond slashing, timeouts, pull-payment
-  withdrawals.
-- Unit, fuzz, and invariant test suites; Slither and Aderyn passes.
+  withdrawals. Unit, fuzz, and invariant test suites; Slither and Aderyn passes.
+- The verifier policy engine (JSON_SCHEMA, GROUND_TRUTH_SAMPLE with enforced
+  commit-reveal), EIP-712 verdict signing, the content-addressed evidence store,
+  and the on-chain submission code. A cross-language golden-vector test proves the
+  Rust verifier and the Solidity contract compute identical EIP-712 digests, so a
+  Rust-signed verdict is accepted by `submitVerdict`.
 
 Designed-for, not yet built:
 
-- The Rust verifier service and policy engine.
-- x402 HTTP layer, ERC-8004 registry wiring, agents, dashboard.
+- The live verify-then-settle loop end-to-end on a chain (local fork, then Fuji),
+  the x402 HTTP layer, ERC-8004 registry wiring, agents, and dashboard.
+- IPFS-backed evidence (the local store implements the same interface today).
 - Staked verifier set / staked jurors, ERC-4626 bond vault, confidential
   settlement via Avalanche eERC.
 
@@ -92,6 +97,13 @@ slither .             # static analysis
 aderyn .              # static analysis
 ```
 
+Rust (1.85+) is required for the verifier.
+
+```
+cd verifier
+cargo test            # policy engine, signing, cross-language digest vector
+```
+
 ## Confirmed on-chain facts
 
 Verified against official sources; addresses are not assumed.
@@ -109,8 +121,10 @@ Verified against official sources; addresses are not assumed.
 
 ## Status
 
-Contracts and their test suites are complete and green. The verifier service is
-next.
+The contracts and the verifier core are complete and green, with the Rust and
+Solidity sides proven to agree on the EIP-712 verdict digest. Next is the live
+verify-then-settle loop (x402 funding and on-chain submission) end-to-end on a
+local fork.
 
 ## License
 
