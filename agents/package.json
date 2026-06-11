@@ -1,0 +1,23 @@
+{
+  "name": "@latch/agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Autonomous agents for Latch: x402 payments, ERC-8004 discovery/reputation, and the verify-then-settle loop.",
+  "scripts": {
+    "provider": "tsx src/provider.ts",
+    "demo": "tsx src/demo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
