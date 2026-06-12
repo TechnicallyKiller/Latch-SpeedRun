@@ -10,9 +10,11 @@ const WINDOW = 30; // shorter challenge window for a snappier live demo (contrac
 let running = false;
 
 async function main() {
-  // Boot the two provider gateways once.
+  // Boot the two provider gateways once. Both use the funded PROVIDER key (the live one-click run
+  // is a single job, not the reputation comparison) — only the mode/answers differ. A FAIL slashes
+  // the bond, which live.ts tops up from the buyer.
   await startProvider({ mode: "honest", key: keys.provider, name: "Honest Provider" }, 4021);
-  await startProvider({ mode: "adversarial", key: keys.provider2, name: "Budget Provider" }, 4022);
+  await startProvider({ mode: "adversarial", key: keys.provider, name: "Budget Provider" }, 4022);
   const commitment = policyCommitment();
   console.log("commitment:", commitment);
 
@@ -41,7 +43,7 @@ async function main() {
     try {
       const provider =
         mode === "fail"
-          ? { url: "http://localhost:4022", addr: addrOf(keys.provider2) }
+          ? { url: "http://localhost:4022", addr: addrOf(keys.provider) }
           : { url: "http://localhost:4021", addr: addrOf(keys.provider) };
       send("start", { mode });
       const result = await runLiveJob(

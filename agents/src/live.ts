@@ -1,5 +1,26 @@
 import { hire, finalizeAndWithdraw } from "./buyer.js";
+import { usdcAbi } from "./shared/abi.js";
+import { USDC, amounts, keys, publicClient, walletFor } from "./shared/config.js";
 import { verifyDeliverable } from "./shared/verifier-runner.js";
+
+/** Keep the provider topped up: a slashed (FAIL) provider loses its bond, so refill if low. */
+async function ensureProviderFunded(provider: `0x${string}`) {
+  const bal = (await publicClient.readContract({
+    address: USDC,
+    abi: usdcAbi,
+    functionName: "balanceOf",
+    args: [provider],
+  })) as bigint;
+  if (bal < amounts.bond) {
+    const tx = await walletFor(keys.buyer).writeContract({
+      address: USDC,
+      abi: usdcAbi,
+      functionName: "transfer",
+      args: [provider, amounts.bond * 10n],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: tx });
+  }
+}
 
 export interface LiveStep {
   key: string;
@@ -15,6 +36,7 @@ export async function runLiveJob(
   opts: { providerUrl: string; providerAddress: `0x${string}`; commitment: `0x${string}`; window: number },
   emit: (s: LiveStep) => void,
 ): Promise<{ jobId: string; pass: boolean }> {
+  await ensureProviderFunded(opts.providerAddress); // refill the provider if a prior slash drained it
   emit({ key: "create", status: "running" });
   const r = await hire(opts);
   emit({ key: "create", status: "done", tx: r.createTx });
