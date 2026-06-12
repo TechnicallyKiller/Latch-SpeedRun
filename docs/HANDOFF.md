@@ -233,4 +233,57 @@ from the deployed site for any judge:
 3. (Optional hardening) rate-limit `/api/run` by IP and add a simple per-window cap so the demo
    accounts can't be griefed.
 
+---
+
+## 10. THE WIN TASK: "judge as buyer" — full real wallet flow (build next)
+
+**Why:** every other agent-payments demo is canned ("they press, you watch"). The thing that wins is
+making the JUDGE the buyer — their wallet, their real USDC, refunded to their wallet when a scammer is
+caught. Converts "test demo" → personal experience. User decision: **FULL & REAL, no MVP shortcut** —
+the judge signs the EIP-3009 payment themselves and the refund lands in their own wallet.
+
+**The on-chain flow already supports this** (see `agents/src/buyer.ts`):
+- `createJob(provider, amount, bond, commitment, 0, deadline, window)` — **msg.sender is the buyer**,
+  so the JUDGE must send this tx (gas only, no USDC moved) to be the on-chain buyer the refund is owed
+  to. `JobCreated` event → jobId.
+- Funding = judge signs USDC **`ReceiveWithAuthorization`** (EIP-3009) for `amount` to `LATCH`, bound
+  to `escrowNonce(jobId)`. Domain: name "USD Coin", version "2", chainId 43113, verifyingContract =
+  USDC. (Exact code: `agents/src/shared/eip3009.ts`.) Our **backend facilitator settles it**
+  (`fundJob` with the sig) — judge never needs to be the facilitator.
+- On FAIL: `finalize(jobId)` (anyone may call) credits `withdrawable[judge]`; **judge calls
+  `withdraw()`** → USDC lands back in their wallet. That `withdraw` tx is the emotional payoff.
+
+**Build steps (frontend-heavy; reuse existing backend):**
+1. **Wallet layer** (`web/src/wallet.ts`): viem injected wallet (`custom(window.ethereum)`), enforce
+   Fuji (43113) — `wallet_addEthereumChain`/`switchChain` if wrong. Expose connect, address, AVAX +
+   USDC balances (poll). Need USDC address + minimal LatchJob/USDC ABIs on the web side (copy the
+   needed fragments from `agents/src/shared/abi.ts`; USDC = `0x5425890298aed601595a70AB815c96711a31Bc65`).
+2. **Faucet-drip** to remove friction: a backend endpoint `POST /api/faucet {addr}` that, if the
+   address has < threshold, sends it a little **AVAX (gas)** + **test USDC** from the funded BUYER/
+   DEPLOYER account so a judge can run one job without hunting faucets. Idempotent / rate-limited.
+   (Keeps it "real" — still their wallet, their signature, real refund — just unblocks them.)
+3. **Post-your-own-job page** (`web/src/pages/Post.tsx`, route `/post`, nav CTA): connect → pick task
+   (small menu or free text) → choose provider **honest vs scammer** → amount (fixed tiny, e.g.
+   0.005 USDC). On submit: (a) judge sends `createJob` (wallet pop #1), (b) judge signs EIP-3009
+   payment (wallet pop #2) — POST sig+jobId+choice to a NEW backend endpoint, (c) backend streams the
+   run over SSE into the SAME workflow tree as Explorer (settle→accept→work→submit→verify→verdict→
+   finalize), (d) on FAIL the UI prompts **"Withdraw your refund"** → judge sends `withdraw` (wallet
+   pop #3) → show their USDC balance tick back up. THIS is the winning moment.
+4. **Backend endpoint** (`agents/src/server.ts`): `POST /api/judge-run` taking `{ jobId, payment(sig+auth),
+   mode }` → facilitator `settle`→`fundJob`, then run provider(mode)+verify+finalize, streaming the
+   same step events. Do NOT call buyer's `finalizeAndWithdraw` (that withdraws to OUR buyer) — only
+   `finalize`; the judge withdraws from their own wallet in the frontend.
+
+**UI/clarity upgrades (close the StackAI "feels alive" gap — animation, not theme):**
+- Animate the edge/connector with a flowing pulse from the just-completed node to the running one.
+- Stream the real artifact INTO each node as it lands (deliverable JSON into `submit`, `score 0/100`
+  into `verify`, tx hash fade-in) — mirrors StackAI's "View Results".
+- Node state snap: idle → amber pulse (running) → green/red (done). `.running` exists; add settle snap.
+- A small live counter (elapsed / tx count) during a run.
+
+**Pitch fix (kill "AI slop"):** lead with ONE wedge + ONE named buyer segment + ONE number, not the
+three-revenue-lines menu. Keep `/business` as the deep-dive; the HEADLINE is a single knife
+("refundable-on-failure payments for agent commerce — the Stripe Radar of agent work, starting with
+[one segment]"). The three revenue lines stay on `/business` as "how it monetizes," not the lead.
+
 Then: recording, merge `staked-committee` -> `main`, short docs/threat-model pass.
