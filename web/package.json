@@ -12,6 +12,7 @@
   "dependencies": {
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-router-dom": "^7.17.0",
     "viem": "^2.52.2"
   },
   "devDependencies": {

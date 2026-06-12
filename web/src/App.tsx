@@ -1,3 +1,6 @@
+import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
+import { Explorer } from "./pages/Explorer";
+
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
 const SNOWTRACE = `https://testnet.snowtrace.io/address/${LATCH}`;
 
@@ -5,14 +8,14 @@ function Nav() {
   return (
     <nav className="nav">
       <div className="wrap nav-inner">
-        <div className="brand">
+        <Link to="/" className="brand">
           <span className="mark" />
           Latch
-        </div>
+        </Link>
         <div className="nav-links">
-          <a href="#loop">How it works</a>
-          <a href="#trust">Trust</a>
-          <a href="#model">Business</a>
+          <a href="/#loop">How it works</a>
+          <Link to="/explorer">Explorer</Link>
+          <a href="/#model">Business</a>
           <a className="pill" href={SNOWTRACE} target="_blank" rel="noreferrer">
             <span className="live" />
             Live on Fuji
@@ -281,10 +284,9 @@ function Footer() {
   );
 }
 
-export default function App() {
+function Landing() {
   return (
     <>
-      <Nav />
       <Hero />
       <Gap />
       <Loop />
@@ -292,5 +294,17 @@ export default function App() {
       <Model />
       <Footer />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Nav />
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/explorer" element={<Explorer />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
