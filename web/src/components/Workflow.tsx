@@ -12,17 +12,19 @@ export function Workflow({
   steps,
   selected,
   onSelect,
+  running,
 }: {
   steps: Step[];
   selected: string;
   onSelect: (key: string) => void;
+  running?: string;
 }) {
   return (
     <div className="flow-graph">
       {steps.map((s, i) => (
         <div className="flow-cell" key={s.key}>
           <button
-            className={`flow-node st-${s.status}${s.key === selected ? " sel" : ""}`}
+            className={`flow-node st-${s.status}${s.key === selected ? " sel" : ""}${s.key === running ? " running" : ""}`}
             onClick={() => onSelect(s.key)}
           >
             <span className="fn-actor">{ACTOR[s.actor]}</span>

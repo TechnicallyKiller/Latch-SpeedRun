@@ -16,6 +16,7 @@ export async function hire(opts: {
   providerUrl: string;
   providerAddress: `0x${string}`;
   commitment: `0x${string}`;
+  window?: number;
 }): Promise<HireResult> {
   const buyer = walletFor(keys.buyer);
   const buyerAddr = addrOf(keys.buyer);
@@ -32,7 +33,7 @@ export async function hire(opts: {
       opts.commitment,
       0n,
       BigInt(Math.floor(Date.now() / 1000) + 86_400),
-      amounts.window,
+      opts.window ?? amounts.window,
     ],
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash: createTx });
