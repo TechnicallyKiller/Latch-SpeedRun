@@ -20,6 +20,9 @@ function Nav() {
             <span className="live" />
             Live on Fuji
           </a>
+          <Link to="/explorer" className="btn btn-primary nav-run">
+            Run a live job
+          </Link>
         </div>
       </div>
     </nav>
@@ -75,7 +78,10 @@ function Hero() {
             evidence-backed correctness verdict from a staked verifier set.
           </p>
           <div className="hero-cta">
-            <a className="btn btn-primary" href="#loop">
+            <Link className="btn btn-primary" to="/explorer">
+              Run a live job →
+            </Link>
+            <a className="btn" href="#loop">
               How it works
             </a>
             <a className="btn" href={SNOWTRACE} target="_blank" rel="noreferrer">
