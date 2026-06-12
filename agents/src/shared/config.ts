@@ -24,6 +24,7 @@ export const keys = {
   deployer: req("DEPLOYER_PRIVATE_KEY") as `0x${string}`,
   buyer: req("BUYER_PRIVATE_KEY") as `0x${string}`,
   provider: req("PROVIDER_PRIVATE_KEY") as `0x${string}`,
+  provider2: req("PROVIDER2_PRIVATE_KEY") as `0x${string}`, // the adversarial provider
   verifier: req("VERIFIER_PRIVATE_KEY") as `0x${string}`,
 };
 

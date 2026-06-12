@@ -1,12 +1,19 @@
 import express, { type Request, type Response } from "express";
 import { keccak256, toBytes } from "viem";
 import { latchAbi } from "./shared/abi.js";
-import { LATCH, USDC, amounts, keys, addrOf, publicClient, walletFor } from "./shared/config.js";
+import { LATCH, USDC, amounts, addrOf, publicClient, walletFor } from "./shared/config.js";
 import { signReceiveAuthorization } from "./shared/eip3009.js";
 import { decodePayment, NETWORK, X402_VERSION, type PaymentRequiredBody } from "./shared/x402.js";
 import { settle } from "./facilitator.js";
 
 export type Mode = "honest" | "adversarial";
+
+export interface ProviderConfig {
+  mode: Mode;
+  key: `0x${string}`;
+  name: string;
+  agentId?: bigint;
+}
 
 const ANSWERS: Record<Mode, Record<string, string>> = {
   honest: { q1: "cat", q2: "dog", q3: "bird" }, // correct
@@ -34,10 +41,8 @@ function paymentRequired(jobId: bigint): PaymentRequiredBody {
   };
 }
 
-/** Provider posts its bond via EIP-3009 and accepts the job. */
-async function acceptJob(jobId: bigint): Promise<`0x${string}`> {
-  const providerWallet = walletFor(keys.provider);
-  const from = addrOf(keys.provider);
+async function acceptJob(jobId: bigint, key: `0x${string}`): Promise<`0x${string}`> {
+  const wallet = walletFor(key);
   const nonce = (await publicClient.readContract({
     address: LATCH,
     abi: latchAbi,
@@ -45,15 +50,15 @@ async function acceptJob(jobId: bigint): Promise<`0x${string}`> {
     args: [jobId],
   })) as `0x${string}`;
   const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600);
-  const { v, r, s } = await signReceiveAuthorization(providerWallet, {
-    from,
+  const { v, r, s } = await signReceiveAuthorization(wallet, {
+    from: addrOf(key),
     to: LATCH,
     value: amounts.bond,
     validAfter: 0n,
     validBefore,
     nonce,
   });
-  const hash = await providerWallet.writeContract({
+  const hash = await wallet.writeContract({
     address: LATCH,
     abi: latchAbi,
     functionName: "acceptJob",
@@ -63,36 +68,34 @@ async function acceptJob(jobId: bigint): Promise<`0x${string}`> {
   return hash;
 }
 
-async function submitDeliverable(jobId: bigint, deliverable: object): Promise<`0x${string}`> {
-  const providerWallet = walletFor(keys.provider);
-  const submissionHash = keccak256(toBytes(JSON.stringify(deliverable)));
-  const hash = await providerWallet.writeContract({
+async function submitDeliverable(jobId: bigint, deliverable: object, key: `0x${string}`): Promise<`0x${string}`> {
+  const wallet = walletFor(key);
+  const hash = await wallet.writeContract({
     address: LATCH,
     abi: latchAbi,
     functionName: "submitDeliverable",
-    args: [jobId, submissionHash],
+    args: [jobId, keccak256(toBytes(JSON.stringify(deliverable)))],
   });
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
 }
 
-export function createProviderApp(mode: Mode) {
+export function createProviderApp(cfg: ProviderConfig) {
   const app = express();
   app.use(express.json());
-  const address = addrOf(keys.provider);
+  const address = addrOf(cfg.key);
 
-  // ERC-8004-style agent card.
   app.get("/.well-known/agent-card", (_req, res) => {
     res.json({
-      name: mode === "honest" ? "Honest Data Provider" : "Budget Data Provider",
+      name: cfg.name,
       address,
+      agentId: cfg.agentId?.toString(),
       capabilities: ["data.label"],
       policies: ["ground_truth_sample"],
       payment: { protocol: "x402", network: NETWORK, asset: USDC },
     });
   });
 
-  // x402-gated hire endpoint.
   app.post("/hire", async (req: Request, res: Response) => {
     try {
       const jobId = BigInt(req.body.jobId);
@@ -101,15 +104,14 @@ export function createProviderApp(mode: Mode) {
         res.status(402).json(paymentRequired(jobId));
         return;
       }
-
       const fund = await settle(jobId, decodePayment(header));
-      const accept = await acceptJob(jobId);
-      const deliverable = ANSWERS[mode];
-      const submit = await submitDeliverable(jobId, deliverable);
+      const accept = await acceptJob(jobId, cfg.key);
+      const deliverable = ANSWERS[cfg.mode];
+      const submit = await submitDeliverable(jobId, deliverable, cfg.key);
 
       res.set(
         "X-PAYMENT-RESPONSE",
-        Buffer.from(JSON.stringify({ success: true, transaction: fund, network: NETWORK, payer: req.body.buyer })).toString("base64"),
+        Buffer.from(JSON.stringify({ success: true, transaction: fund, network: NETWORK })).toString("base64"),
       );
       res.json({ jobId: jobId.toString(), deliverable, txs: { fund, accept, submit } });
     } catch (err) {
@@ -120,6 +122,6 @@ export function createProviderApp(mode: Mode) {
   return app;
 }
 
-export function startProvider(mode: Mode, port: number): Promise<void> {
-  return new Promise((resolve) => createProviderApp(mode).listen(port, resolve));
+export function startProvider(cfg: ProviderConfig, port: number): Promise<void> {
+  return new Promise((resolve) => createProviderApp(cfg).listen(port, resolve));
 }

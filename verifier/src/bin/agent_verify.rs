@@ -76,8 +76,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // single JSON line for the orchestrator to parse
         println!(
-            "{{\"pass\":{},\"score\":\"{}\",\"tx\":\"{:#x}\"}}",
-            signed.verdict.pass, signed.verdict.score, tx
+            "{{\"pass\":{},\"score\":\"{}\",\"reasonHash\":\"{:#x}\",\"evidenceURI\":\"{}\",\"tx\":\"{:#x}\"}}",
+            signed.verdict.pass, signed.verdict.score, signed.verdict.reasonHash, signed.verdict.evidenceURI, tx
         );
         return Ok(());
     }

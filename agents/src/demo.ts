@@ -27,7 +27,7 @@ async function main() {
   console.log("policy commitment:", commitment);
 
   const PORT = 4021;
-  await startProvider(mode, PORT);
+  await startProvider({ mode, key: keys.provider, name: "Data Provider" }, PORT);
   const providerUrl = `http://localhost:${PORT}`;
   console.log("provider online:  ", providerUrl, "\n");
 
