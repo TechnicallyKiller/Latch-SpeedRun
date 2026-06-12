@@ -33,13 +33,19 @@ of every transaction we make safe, and we run the staked network that decides wh
 | ERC-8004 (identity + reputation, real Fuji registries) | done | two-provider reputation demo live |
 | Frontend landing (Swiss/technical design) | done | web/ |
 | Frontend Explorer (n8n-style per-job workflow tree) | done | /explorer |
+| Frontend Business page (full revenue/economics/risks) | done | /business |
+| **One-click "Run a live job"** (SSE backend + live tree) | done | `agents/src/server.ts` + Explorer run-bar; real Fuji jobs stream node-by-node |
 
-**~72% toward a polished, judge-ready submission.** The hard/novel ~80% is done.
+**~82% toward a polished, judge-ready submission.** The hard/novel work is done; what's left is
+hosting + recording, not new protocol.
 
-### What's NOT done (next)
-1. **One-click "Run a live job"** — a button on the site that triggers a real agent job on Fuji and
-   streams it into the Explorer live (small backend wrapping the agent orchestrator + frontend SSE).
-   *This is the next thing to build.*
+### What's NOT done (next) — "put up the agents"
+1. **Host the live-run backend publicly (the one remaining build).** The one-click run works locally
+   but the Explorer points at a hardcoded `SERVER = "http://localhost:4030"` (`web/src/pages/Explorer.tsx`).
+   For the deployed site, the `agents/src/server.ts` SSE server must run on a public host (Railway /
+   Render / Fly / a small VM) with the funded demo `.env`, and the frontend must read the URL from an
+   env var (e.g. `VITE_LIVE_RUN_URL`) instead of localhost. CORS is already `*`. Then the "Run a live
+   job" buttons work for any judge, from the live site, with no local setup. **This is the next thing.**
 2. Connect-wallet "post your own job" + agent SDK/docs page.
 3. Recording, merge `staked-committee` -> `main`, docs/threat-model pass.
 
@@ -73,9 +79,13 @@ cargo run --bin fuji_demo -- pass|fail         # live Fuji single-loop demo
 # agents (real x402 + ERC-8004, live on Fuji)
 cd agents && npm run demo                       # single honest agent loop
 npm run reputation-demo                         # two competing providers, reputation-picked
+npm run server                                  # live-run SSE backend on :4030 (the one-click run)
+                                                #   GET /api/run?mode=honest|fail -> streams step events
+                                                #   boots provider gateways on :4021/:4022; one job at a time
 
 # web
-cd web && npm run dev                           # http://localhost:5173  (/ landing, /explorer)
+cd web && npm run dev                           # http://localhost:5173  (/ landing, /explorer, /business)
+#   NOTE: the Explorer's "Run a live job" needs `npm run server` (agents) running on :4030.
 ```
 
 ---
@@ -142,12 +152,20 @@ latch/
 │   │   │                           by key/mode/agentId; honest vs adversarial)
 │   │   ├── buyer.ts                buyer agent: createJob + x402 client + finalizeAndWithdraw
 │   │   ├── demo.ts                 single honest loop orchestrator
-│   │   └── reputation-demo.ts      TWO competing providers, reputation-picked (headline)
+│   │   ├── reputation-demo.ts      TWO competing providers, reputation-picked (headline)
+│   │   ├── server.ts               LIVE-RUN SSE backend (:4030) — the one-click run; boots provider
+│   │   │                           gateways on :4021/:4022 (both use funded PROVIDER key), one job
+│   │   │                           at a time, GET /api/run?mode=honest|fail streams step events
+│   │   └── live.ts                 runLiveJob(): one real Fuji job emitting create/fund/accept/submit/
+│   │                               verify/verdict/finalize/outcome; tops provider USDC from buyer if a
+│   │                               prior FAIL slashed its bond
 │
 └── web/                            Vite + React + TS · viem · react-router · Swiss design
     └── src/
-        ├── App.tsx                 landing (Hero/Gap/Loop/Trust/Model) + routing
-        ├── pages/Explorer.tsx      /explorer — n8n workflow tree, 2 real jobs (PASS/FAIL toggle)
+        ├── App.tsx                 landing (Hero/Gap/Loop/Trust/Model) + routing (/ /explorer /business)
+        ├── pages/Explorer.tsx      /explorer — n8n workflow tree + one-click live run (SSE -> :4030);
+        │                           2 real settled reference jobs + the live job. SERVER const = :4030
+        ├── pages/Business.tsx      /business — full business model (revenue/verifier economics/demand/risks)
         ├── components/             Workflow.tsx (node graph), NodeDetail.tsx (click -> code map)
         ├── chain.ts                STATIC real job data (hardcoded real tx hashes; no chain scan)
         ├── lifecycle.ts            step/node defs + per-node explanation + code refs (Rust->Sol->TS)
@@ -194,18 +212,25 @@ BuyerAgent.createJob -> provider /hire returns HTTP 402 -> buyer signs EIP-3009 
 
 ---
 
-## 8. Next task (in progress): one-click "Run a live job"
+## 8. DONE: one-click "Run a live job"
 
-Goal: a button on the site (or `/explorer`) that triggers a REAL agent job on Fuji and streams it
-into the Explorer live, node-by-node, with Snowtrace links — no wallet needed (runs on our funded
-demo accounts), rate-limited so it can't be drained.
+Built and verified on Fuji. `agents/src/server.ts` (express, :4030) exposes
+`GET /api/run?mode=honest|fail` and streams step events over SSE; `agents/src/live.ts` runs one real
+job (create/fund/accept/submit/verify/verdict/finalize/outcome). The Explorer run-bar opens the SSE
+stream and lights up nodes live with real tx hashes. Both gateways use the funded PROVIDER key, and
+`live.ts` tops the provider's USDC up from the buyer if a prior FAIL slashed its bond — so repeated
+runs (honest or scammer) never drain. `running` flag enforces one job at a time; CORS `*`.
 
-Plan:
-1. Small backend (Node/express) in `agents/` exposing `POST /api/run` (honest|fail) that runs the
-   orchestrator and streams steps via SSE (`{ step, tx }` events). Reuse buyer.ts / provider.ts /
-   verifier-runner.ts. Rate-limit + tiny amounts.
-2. Frontend: a "Run a live job" control that opens the SSE stream, adds a new job to the Explorer,
-   and lights up nodes as each `tx` arrives (the lifecycle tree already exists in `lifecycle.ts`).
-3. Keep the static example jobs as the always-present default.
+## 9. Next task: host the live-run backend ("put up the agents")
 
-Then: recording, merge to `main`, short docs pass.
+The one-click run only works when `npm run server` is running locally on :4030, because
+`web/src/pages/Explorer.tsx` has `const SERVER = "http://localhost:4030"` hardcoded. To make it work
+from the deployed site for any judge:
+1. Deploy `agents/` (`npm run server`) to a public host (Railway / Render / Fly / small VM) with the
+   funded demo `.env`. It needs outbound Fuji RPC + the demo private keys; keep amounts tiny.
+2. Replace the hardcoded `SERVER` with an env var, e.g. `const SERVER = import.meta.env.VITE_LIVE_RUN_URL
+   ?? "http://localhost:4030"`, and set `VITE_LIVE_RUN_URL` in the site's build env.
+3. (Optional hardening) rate-limit `/api/run` by IP and add a simple per-window cap so the demo
+   accounts can't be griefed.
+
+Then: recording, merge `staked-committee` -> `main`, short docs/threat-model pass.

@@ -414,11 +414,78 @@ h2.title {
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
+.cols-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
 .std {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.06em;
   color: var(--red);
+}
+
+/* ---------- business page ---------- */
+
+.formula {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.015);
+}
+.compare {
+  margin-top: 36px;
+  border-top: 1px solid var(--line);
+}
+.cmp {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: baseline;
+}
+.cmp-k {
+  font-size: 13px;
+  color: var(--red);
+  letter-spacing: 0.02em;
+}
+.cmp-v {
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.phases {
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: phase;
+}
+.phases li {
+  counter-increment: phase;
+  position: relative;
+  padding: 16px 0 16px 52px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.phases li::before {
+  content: counter(phase, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 16px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--red);
+}
+.phases li b {
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ---------- flow ---------- */
@@ -572,10 +639,16 @@ h2.title {
   border-color: #e6a86b;
 }
 
+.exp-sublabel {
+  margin: 30px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
 .exp-tabs {
   display: flex;
   gap: 12px;
-  margin: 22px 0 18px;
+  margin: 12px 0 18px;
   flex-wrap: wrap;
 }
 .exp-tab {
@@ -960,6 +1033,8 @@ h2.title {
 @media (max-width: 900px) {
   .hero-grid,
   .cols-3,
+  .cols-2,
+  .cmp,
   .flow,
   .split {
     grid-template-columns: 1fr;

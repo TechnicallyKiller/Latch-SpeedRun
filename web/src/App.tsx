@@ -1,5 +1,6 @@
 import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
 import { Explorer } from "./pages/Explorer";
+import { Business } from "./pages/Business";
 
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
 const SNOWTRACE = `https://testnet.snowtrace.io/address/${LATCH}`;
@@ -15,7 +16,7 @@ function Nav() {
         <div className="nav-links">
           <a href="/#loop">How it works</a>
           <Link to="/explorer">Explorer</Link>
-          <a href="/#model">Business</a>
+          <Link to="/business">Business</Link>
           <a className="pill" href={SNOWTRACE} target="_blank" rel="noreferrer">
             <span className="live" />
             Live on Fuji
@@ -275,6 +276,9 @@ function Model() {
               <p>Oracle-network economics: verifiers earn fees, stake yields, reputation compounds.</p>
             </div>
           </div>
+          <Link className="btn btn-primary" to="/business" style={{ marginTop: 32 }}>
+            Read the full model →
+          </Link>
         </div>
       </div>
     </section>
@@ -310,6 +314,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/explorer" element={<Explorer />} />
+        <Route path="/business" element={<Business />} />
       </Routes>
     </BrowserRouter>
   );

@@ -101,10 +101,11 @@ export function Explorer() {
       <header className="exp-head">
         <div>
           <span className="eyebrow">Live explorer</span>
-          <h1 className="exp-title">Every job, mapped step by step.</h1>
+          <h1 className="exp-title">Watch a real job settle, step by step.</h1>
           <p className="lead">
-            Real jobs on Fuji. Trigger one yourself — no wallet needed — and watch it settle on-chain,
-            node by node. Click any node for the exact code (Rust → Solidity) and the transaction.
+            Press a button below and Latch runs a <b>real job on Fuji</b> — no wallet needed. Each
+            node lights up as it lands on-chain; click one for the exact code (Rust → Solidity) and
+            the live transaction. Below the run are two jobs already settled on-chain you can inspect.
           </p>
         </div>
         <a className="exp-contract mono" href={snowtraceAddr(LATCH)} target="_blank" rel="noreferrer">
@@ -125,6 +126,9 @@ export function Explorer() {
         {phase === "error" && <span className="run-status mono err">{errMsg}</span>}
       </div>
 
+      <div className="exp-sublabel mono">
+        {live ? "Your live run — and two reference jobs settled earlier on Fuji:" : "Two reference jobs already settled on Fuji — every hash is real and clickable:"}
+      </div>
       <div className="exp-tabs">
         {jobs.map((j, i) => {
           const isLive = live !== null && i === 0;
