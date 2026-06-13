@@ -3,38 +3,12 @@ import { JOBS, LATCH, snowtraceAddr, usdc, type Job } from "../chain";
 import { buildSteps } from "../lifecycle";
 import { Workflow } from "../components/Workflow";
 import { NodeDetail } from "../components/NodeDetail";
+import { applyStep, emptyLive as makeLive, type LiveStep } from "../live-job";
 
-const SERVER = "http://localhost:4030";
-
-interface LiveStep {
-  key: string;
-  status: "running" | "done" | "pass" | "fail";
-  tx?: `0x${string}`;
-  note?: string;
-}
+export const SERVER = import.meta.env.VITE_LIVE_RUN_URL ?? "http://localhost:4030";
 
 function emptyLive(mode: string): Job {
-  return { id: 0n, label: `Live run · ${mode === "fail" ? "scammer" : "honest"}`, amount: 5000n, bond: 1000n };
-}
-
-function applyStep(job: Job, s: LiveStep): Job {
-  const j: Job = { ...job };
-  const tx = s.tx;
-  if (s.key === "create" && tx) j.created = { tx };
-  else if (s.key === "fund" && tx) j.funded = { tx };
-  else if (s.key === "accept" && tx) j.accepted = { tx };
-  else if (s.key === "submit" && tx) j.submitted = { tx };
-  else if (s.key === "verify" && (s.status === "pass" || s.status === "fail")) {
-    const score = BigInt(s.note?.match(/score (\d+)/)?.[1] ?? "0");
-    j.verdict = { tx: j.verdict?.tx ?? ("0x" as `0x${string}`), pass: s.status === "pass", score, evidenceURI: "ipfs://(pinned)", signers: 1n };
-  } else if (s.key === "verdict" && tx) {
-    const pass = s.status === "pass";
-    j.verdict = { ...(j.verdict ?? { pass, score: 0n, evidenceURI: "ipfs://(pinned)", signers: 1n }), tx };
-  } else if ((s.key === "finalize" || s.key === "outcome") && tx) {
-    const pass = j.verdict?.pass ?? s.status === "pass";
-    j.settled = { tx, pass, proceeds: pass ? 4950n : 0n, fee: pass ? 50n : 0n };
-  }
-  return j;
+  return makeLive(`Live run · ${mode === "fail" ? "scammer" : "honest"}`);
 }
 
 export function Explorer() {

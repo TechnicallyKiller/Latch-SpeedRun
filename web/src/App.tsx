@@ -1,6 +1,7 @@
 import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
 import { Explorer } from "./pages/Explorer";
 import { Business } from "./pages/Business";
+import { Post } from "./pages/Post";
 
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
 const SNOWTRACE = `https://testnet.snowtrace.io/address/${LATCH}`;
@@ -21,8 +22,8 @@ function Nav() {
             <span className="live" />
             Live on Fuji
           </a>
-          <Link to="/explorer" className="btn btn-primary nav-run">
-            Run a live job
+          <Link to="/post" className="btn btn-primary nav-run">
+            Post a job
           </Link>
         </div>
       </div>
@@ -79,12 +80,12 @@ function Hero() {
             evidence-backed correctness verdict from a staked verifier set.
           </p>
           <div className="hero-cta">
-            <Link className="btn btn-primary" to="/explorer">
-              Run a live job →
+            <Link className="btn btn-primary" to="/post">
+              Post a job with your wallet →
             </Link>
-            <a className="btn" href="#loop">
-              How it works
-            </a>
+            <Link className="btn" to="/explorer">
+              Watch a live demo →
+            </Link>
             <a className="btn" href={SNOWTRACE} target="_blank" rel="noreferrer">
               View the contract ↗
             </a>
@@ -314,6 +315,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/explorer" element={<Explorer />} />
+        <Route path="/post" element={<Post />} />
         <Route path="/business" element={<Business />} />
       </Routes>
     </BrowserRouter>

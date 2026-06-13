@@ -15,7 +15,7 @@ export interface ProviderConfig {
   agentId?: bigint;
 }
 
-const ANSWERS: Record<Mode, Record<string, string>> = {
+export const ANSWERS: Record<Mode, Record<string, string>> = {
   honest: { q1: "cat", q2: "dog", q3: "bird" }, // correct
   adversarial: { q1: "lion", q2: "fish", q3: "snake" }, // well-formed, wrong
 };
@@ -41,7 +41,7 @@ function paymentRequired(jobId: bigint): PaymentRequiredBody {
   };
 }
 
-async function acceptJob(jobId: bigint, key: `0x${string}`): Promise<`0x${string}`> {
+export async function acceptJob(jobId: bigint, key: `0x${string}`): Promise<`0x${string}`> {
   const wallet = walletFor(key);
   const nonce = (await publicClient.readContract({
     address: LATCH,
@@ -68,7 +68,7 @@ async function acceptJob(jobId: bigint, key: `0x${string}`): Promise<`0x${string
   return hash;
 }
 
-async function submitDeliverable(jobId: bigint, deliverable: object, key: `0x${string}`): Promise<`0x${string}`> {
+export async function submitDeliverable(jobId: bigint, deliverable: object, key: `0x${string}`): Promise<`0x${string}`> {
   const wallet = walletFor(key);
   const hash = await wallet.writeContract({
     address: LATCH,

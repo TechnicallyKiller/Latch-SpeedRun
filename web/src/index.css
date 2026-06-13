@@ -639,6 +639,19 @@ h2.title {
   border-color: #e6a86b;
 }
 
+.judge-refund {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border: 1px solid var(--line-red);
+  background: var(--red-wash);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--text);
+}
 .exp-sublabel {
   margin: 30px 0 0;
   font-size: 12px;
