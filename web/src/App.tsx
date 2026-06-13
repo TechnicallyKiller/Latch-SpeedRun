@@ -3,6 +3,8 @@ import { Explorer } from "./pages/Explorer";
 import { Business } from "./pages/Business";
 import { Post } from "./pages/Post";
 import { Docs } from "./pages/Docs";
+import { Sdk } from "./pages/Sdk";
+import { Security } from "./pages/Security";
 
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
 const SNOWTRACE = `https://testnet.snowtrace.io/address/${LATCH}`;
@@ -318,6 +320,8 @@ export default function App() {
         <Route path="/explorer" element={<Explorer />} />
         <Route path="/post" element={<Post />} />
         <Route path="/docs" element={<Docs />} />
+        <Route path="/sdk" element={<Sdk />} />
+        <Route path="/security" element={<Security />} />
         <Route path="/business" element={<Business />} />
       </Routes>
     </BrowserRouter>

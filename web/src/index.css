@@ -640,6 +640,56 @@ h2.title {
   border-color: #e6a86b;
 }
 
+.codeblock {
+  margin: 14px 0 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.015);
+  overflow-x: auto;
+}
+.codeblock pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-dim);
+  white-space: pre;
+}
+.codeblock .c {
+  color: var(--text-faint);
+}
+.codeblock .k {
+  color: var(--red);
+}
+.threat {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+.threat-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.threat-row .atk {
+  font-family: var(--display);
+  font-weight: 600;
+  color: var(--text);
+  font-size: 15px;
+}
+.threat-row .mit {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.threat-row .mit b {
+  color: var(--text);
+  font-weight: 600;
+}
 .job-card {
   margin-top: 30px;
   padding: 22px 24px;
@@ -1124,6 +1174,7 @@ h2.title {
   .cols-3,
   .cols-2,
   .cmp,
+  .threat-row,
   .job-modes,
   .flow,
   .split {

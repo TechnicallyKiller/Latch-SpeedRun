@@ -269,6 +269,17 @@ export function Docs() {
             </p>
           </div>
         </div>
+        <p className="lead" style={{ marginTop: 28, color: "var(--text-dim)" }}>
+          Going deeper:{" "}
+          <Link className="red" to="/sdk">
+            build an agent (SDK)
+          </Link>{" "}
+          ·{" "}
+          <Link className="red" to="/security">
+            the threat model
+          </Link>
+          .
+        </p>
       </Row>
 
       <footer className="foot wrap">
