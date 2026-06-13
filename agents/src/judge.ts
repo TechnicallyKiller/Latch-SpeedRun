@@ -1,7 +1,8 @@
 import { latchAbi, usdcAbi } from "./shared/abi.js";
 import { LATCH, USDC, amounts, addrOf, keys, publicClient, walletFor } from "./shared/config.js";
 import { verifyDeliverable } from "./shared/verifier-runner.js";
-import { acceptJob, submitDeliverable, ANSWERS } from "./provider.js";
+import { acceptJob, submitDeliverable } from "./provider.js";
+import { work } from "./shared/ai.js";
 import type { LiveStep } from "./live.js";
 
 /** The judge already signed the USDC ReceiveWithAuthorization; the facilitator redeems it on-chain. */
@@ -55,7 +56,7 @@ export async function runJudgeJob(p: JudgePayment, emit: (s: LiveStep) => void):
   const mode = p.mode === "fail" ? "adversarial" : "honest";
   const accept = await acceptJob(jobId, keys.provider);
   emit({ key: "accept", status: "done", tx: accept });
-  const deliverable = ANSWERS[mode];
+  const { deliverable } = await work(mode); // real Claude agent (or canned fallback)
   const submit = await submitDeliverable(jobId, deliverable, keys.provider);
   emit({ key: "submit", status: "done", tx: submit, note: JSON.stringify(deliverable) });
 

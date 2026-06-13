@@ -5,8 +5,9 @@ import { LATCH, USDC, amounts, addrOf, publicClient, walletFor } from "./shared/
 import { signReceiveAuthorization } from "./shared/eip3009.js";
 import { decodePayment, NETWORK, X402_VERSION, type PaymentRequiredBody } from "./shared/x402.js";
 import { settle } from "./facilitator.js";
+import { work, type Mode } from "./shared/ai.js";
 
-export type Mode = "honest" | "adversarial";
+export type { Mode };
 
 export interface ProviderConfig {
   mode: Mode;
@@ -14,11 +15,6 @@ export interface ProviderConfig {
   name: string;
   agentId?: bigint;
 }
-
-export const ANSWERS: Record<Mode, Record<string, string>> = {
-  honest: { q1: "cat", q2: "dog", q3: "bird" }, // correct
-  adversarial: { q1: "lion", q2: "fish", q3: "snake" }, // well-formed, wrong
-};
 
 function paymentRequired(jobId: bigint): PaymentRequiredBody {
   return {
@@ -106,7 +102,7 @@ export function createProviderApp(cfg: ProviderConfig) {
       }
       const fund = await settle(jobId, decodePayment(header));
       const accept = await acceptJob(jobId, cfg.key);
-      const deliverable = ANSWERS[cfg.mode];
+      const { deliverable } = await work(cfg.mode); // real Claude agent (or canned fallback)
       const submit = await submitDeliverable(jobId, deliverable, cfg.key);
 
       res.set(
