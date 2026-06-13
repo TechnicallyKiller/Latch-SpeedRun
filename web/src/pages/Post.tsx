@@ -41,6 +41,7 @@ export function Post() {
   const [refund, setRefund] = useState<bigint>(0n);
   const [withdrawTx, setWithdrawTx] = useState<`0x${string}` | null>(null);
   const [engine, setEngine] = useState<string | null>(null);
+  const [queued, setQueued] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`${SERVER}/api/config`)
@@ -94,6 +95,7 @@ export function Post() {
     setRefund(0n);
     setWithdrawTx(null);
     setSelKey("create");
+    setQueued(null);
     try {
       const cfg: Config = await fetch(`${SERVER}/api/config`).then((r) => r.json());
       const amount = BigInt(cfg.amount);
@@ -127,7 +129,10 @@ export function Post() {
         body: JSON.stringify({ jobId: jobId.toString(), ...pay, mode }),
       });
       await readSSE(res, {
+        queued: (d: { ahead: number }) => setQueued(d.ahead),
+        start: () => setQueued(null),
         step: (s: LiveStep) => {
+          setQueued(null);
           if (s.status === "running") setRunning(s.key);
           else {
             setRunning((r) => (r === s.key ? null : r));
@@ -260,6 +265,9 @@ export function Post() {
               </a>
             )}
           </span>
+        )}
+        {phase === "running" && queued !== null && queued > 0 && (
+          <span className="run-status mono">queued · {queued} ahead (~{queued * 50}s)… your job runs automatically.</span>
         )}
         {phase === "error" && <span className="run-status mono err">{err}</span>}
       </div>

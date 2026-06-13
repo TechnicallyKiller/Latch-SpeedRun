@@ -60,6 +60,7 @@ export function Explorer() {
   const lastBalRef = useRef<{ buyer: string; provider: string } | null>(null);
   const [flash, setFlash] = useState(0); // bumps on each balance update to retrigger the flash anim
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [queued, setQueued] = useState<number | null>(null); // jobs ahead in the queue, if waiting
 
   useEffect(() => {
     fetch(`${SERVER}/api/config`)
@@ -111,7 +112,9 @@ export function Explorer() {
 
   function bindStream(es: EventSource, opts?: { onStart?: (mode: string) => void }) {
     let finished = false;
+    es.addEventListener("queued", (e) => setQueued(JSON.parse((e as MessageEvent).data).ahead));
     es.addEventListener("start", (e) => {
+      setQueued(null); // our turn now
       const mode = JSON.parse((e as MessageEvent).data).mode === "fail" ? "fail" : "honest";
       opts?.onStart?.(mode);
     });
@@ -167,6 +170,7 @@ export function Explorer() {
     setRunning(null);
     setBalances(null);
     setDelta(null);
+    setQueued(null);
     lastBalRef.current = null;
 
     const es = new EventSource(`${SERVER}/api/run?mode=${mode}`);
@@ -233,7 +237,10 @@ export function Explorer() {
         <button className="btn" disabled={phase === "running"} onClick={() => run("fail")}>
           Scammer provider
         </button>
-        {phase === "running" && <span className="run-status mono">running on Fuji…</span>}
+        {phase === "running" && queued !== null && queued > 0 && (
+          <span className="run-status mono">queued · {queued} ahead (~{queued * 50}s)…</span>
+        )}
+        {phase === "running" && !queued && <span className="run-status mono">running on Fuji…</span>}
         {phase === "done" && <span className="run-status mono ok">settled ✓</span>}
         {phase === "error" && <span className="run-status mono err">{errMsg}</span>}
         {engine && (

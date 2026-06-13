@@ -47,7 +47,13 @@ export function applyStep(job: Job, s: LiveStep): Job {
 /** Read an SSE stream from a POST/fetch response body, invoking handlers per named event. */
 export async function readSSE(
   res: Response,
-  handlers: { start?: (d: any) => void; step?: (d: LiveStep) => void; done?: (d: any) => void; error?: (d: any) => void },
+  handlers: {
+    start?: (d: any) => void;
+    step?: (d: LiveStep) => void;
+    done?: (d: any) => void;
+    error?: (d: any) => void;
+    queued?: (d: any) => void;
+  },
 ) {
   const reader = res.body!.getReader();
   const dec = new TextDecoder();

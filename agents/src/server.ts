@@ -11,7 +11,49 @@ import { engineName, TASK } from "./shared/ai.js";
 const PORT = Number(process.env.PORT ?? 4030); // hosts (Render/Fly/…) inject $PORT
 const WINDOW = 30; // shorter challenge window for a snappier live demo (contract minimum)
 
-let running = false;
+// Jobs share demo accounts + on-chain nonces, so they run one at a time. Instead of rejecting a
+// second caller, queue them and stream their position so they wait gracefully.
+type Send = (event: string, data: unknown) => void;
+interface QJob {
+  send: Send;
+  doRun: () => Promise<void>;
+  canceled: boolean;
+}
+const waiting: QJob[] = [];
+let active = false;
+
+function broadcastPositions() {
+  waiting.filter((j) => !j.canceled).forEach((j, i) => j.send("queued", { ahead: i + 1 }));
+}
+
+async function pump() {
+  if (active) return;
+  let job: QJob | undefined;
+  while ((job = waiting.shift())) if (!job.canceled) break;
+  if (!job || job.canceled) return;
+  active = true;
+  broadcastPositions(); // remaining waiters are now N-ahead
+  try {
+    await job.doRun();
+  } catch {
+    /* doRun handles its own errors */
+  } finally {
+    active = false;
+    pump();
+  }
+}
+
+/** Enqueue a run; the caller's SSE stays open and receives `queued` updates until it's their turn. */
+function enqueue(req: import("express").Request, send: Send, doRun: () => Promise<void>) {
+  const job: QJob = { send, doRun, canceled: false };
+  waiting.push(job);
+  req.on("close", () => {
+    job.canceled = true;
+  });
+  const ahead = (active ? 1 : 0) + waiting.filter((j) => !j.canceled).length - 1;
+  if (ahead > 0) send("queued", { ahead });
+  pump();
+}
 
 // Buffer the in-progress run so a client that navigates away (or reloads) can reattach and resume,
 // instead of seeing a blank page while the backend keeps working.
@@ -45,7 +87,6 @@ async function trackedRun(
   runner: (emit: (s: unknown) => void) => Promise<unknown>,
 ) {
   current = { mode, steps: [], phase: "running" };
-  running = true;
   send("start", { mode });
   broadcast("start", { mode });
   try {
@@ -64,7 +105,6 @@ async function trackedRun(
     send("error", { error: String(e) });
     broadcast("error", { error: String(e) });
   } finally {
-    running = false;
     res.end();
   }
 }
@@ -134,12 +174,10 @@ async function main() {
     res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
     (res as any).flushHeaders?.();
     const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    if (running) {
-      send("error", { error: "a job is already running — try again in a moment" });
-      return res.end();
-    }
-    await trackedRun(res, req.body.mode, send, (emit) =>
-      runJudgeJob({ ...req.body, window: WINDOW }, emit as (s: unknown) => void),
+    enqueue(req, send, () =>
+      trackedRun(res, req.body.mode, send, (emit) =>
+        runJudgeJob({ ...req.body, window: WINDOW }, emit as (s: unknown) => void),
+      ),
     );
   });
 
@@ -155,19 +193,16 @@ async function main() {
     (res as any).flushHeaders?.();
     const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
-    if (running) {
-      send("error", { error: "a live job is already running — try again in a moment" });
-      res.end();
-      return;
-    }
     const provider =
       mode === "fail"
         ? { url: "http://localhost:4022", addr: addrOf(keys.provider) }
         : { url: "http://localhost:4021", addr: addrOf(keys.provider) };
-    await trackedRun(res, mode, send, (emit) =>
-      runLiveJob(
-        { providerUrl: provider.url, providerAddress: provider.addr, commitment, window: WINDOW },
-        emit as (s: unknown) => void,
+    enqueue(req, send, () =>
+      trackedRun(res, mode, send, (emit) =>
+        runLiveJob(
+          { providerUrl: provider.url, providerAddress: provider.addr, commitment, window: WINDOW },
+          emit as (s: unknown) => void,
+        ),
       ),
     );
   });

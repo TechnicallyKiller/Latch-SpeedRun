@@ -49,6 +49,7 @@ export function Marketplace() {
   const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [selKey, setSelKey] = useState("create");
+  const [queued, setQueued] = useState<number | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
   const steps = useMemo(() => (job ? buildSteps(job) : []), [job]);
@@ -56,7 +57,9 @@ export function Marketplace() {
 
   function bindStream(es: EventSource, opts?: { onStart?: (mode: "honest" | "fail") => void }) {
     let finished = false;
+    es.addEventListener("queued", (e) => setQueued(JSON.parse((e as MessageEvent).data).ahead));
     es.addEventListener("start", (e) => {
+      setQueued(null);
       const mode = JSON.parse((e as MessageEvent).data).mode === "fail" ? "fail" : "honest";
       opts?.onStart?.(mode);
     });
@@ -116,6 +119,7 @@ export function Marketplace() {
     setSelKey("create");
     setPhase("running");
     setErrMsg(null);
+    setQueued(null);
 
     const es = new EventSource(`${SERVER}/api/run?mode=${p.mode}`);
     esRef.current = es;
@@ -166,6 +170,12 @@ export function Marketplace() {
           </div>
         ))}
       </div>
+
+      {phase === "running" && queued !== null && queued > 0 && (
+        <div className="mkt-result">
+          <span className="run-status mono">queued · {queued} ahead (~{queued * 50}s)… your job will run automatically.</span>
+        </div>
+      )}
 
       {(phase === "done" || phase === "error") && (
         <div className="mkt-result">
