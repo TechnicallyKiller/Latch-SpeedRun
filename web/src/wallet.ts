@@ -2,15 +2,20 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
+  http,
   parseAbi,
   parseEventLogs,
   type Address,
-  type WalletClient,
   type PublicClient,
+  type WalletClient,
 } from "viem";
 import { avalancheFuji } from "viem/chains";
 
 const FUJI_HEX = "0xa869"; // 43113
+const FUJI_RPC = "https://api.avax-test.network/ext/bc/C/rpc";
+
+// Confirmations can lag on a wallet's built-in RPC; wait generously against a reliable endpoint.
+const WAIT = { timeout: 180_000, pollingInterval: 2_000, confirmations: 1 } as const;
 
 const latchAbi = parseAbi([
   "function createJob(address provider, uint256 amount, uint256 providerBond, bytes32 policyCommitment, uint256 providerAgentId, uint64 submissionDeadline, uint32 challengeWindow) returns (uint256)",
@@ -39,7 +44,8 @@ export async function connect(): Promise<Wallet> {
   const [address] = (await provider.request({ method: "eth_requestAccounts" })) as Address[];
   await ensureFuji(provider);
   const wallet = createWalletClient({ account: address, chain: avalancheFuji, transport: custom(provider) });
-  const pub = createPublicClient({ chain: avalancheFuji, transport: custom(provider) });
+  // reads/receipts go through a dedicated RPC (the wallet's built-in one is often slow to confirm)
+  const pub = createPublicClient({ chain: avalancheFuji, transport: http(FUJI_RPC) });
   return { address, wallet, pub };
 }
 
@@ -88,7 +94,7 @@ export async function createJob(
     functionName: "createJob",
     args: [args.provider, args.amount, args.bond, args.commitment, 0n, BigInt(Math.floor(Date.now() / 1000) + 86_400), args.window],
   });
-  const receipt = await w.pub.waitForTransactionReceipt({ hash: tx });
+  const receipt = await w.pub.waitForTransactionReceipt({ hash: tx, ...WAIT });
   const logs = parseEventLogs({ abi: latchAbi, logs: receipt.logs, eventName: "JobCreated" });
   return { jobId: logs[0].args.jobId as bigint, tx };
 }
@@ -145,6 +151,6 @@ export async function withdrawableOf(w: Wallet, latch: Address): Promise<bigint>
 /** Judge pulls their refund, the USDC lands back in their wallet. The payoff moment. */
 export async function withdraw(w: Wallet, latch: Address): Promise<`0x${string}`> {
   const tx = await w.wallet.writeContract({ account: w.address, chain: avalancheFuji, address: latch, abi: latchAbi, functionName: "withdraw", args: [] });
-  await w.pub.waitForTransactionReceipt({ hash: tx });
+  await w.pub.waitForTransactionReceipt({ hash: tx, ...WAIT });
   return tx;
 }
