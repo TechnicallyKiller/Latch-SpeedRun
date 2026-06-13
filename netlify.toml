@@ -1,0 +1,11 @@
+# Deploys the Latch frontend (web/). The agent server (agents/) is hosted separately (Render).
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = "dist"
+
+# SPA fallback so client-side routes (/post, /docs, /explorer, /business) resolve.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

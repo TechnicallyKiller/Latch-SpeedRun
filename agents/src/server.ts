@@ -8,7 +8,7 @@ import { runLiveJob } from "./live.js";
 import { runJudgeJob } from "./judge.js";
 import { engineName, TASK } from "./shared/ai.js";
 
-const PORT = 4030;
+const PORT = Number(process.env.PORT ?? 4030); // hosts (Render/Fly/…) inject $PORT
 const WINDOW = 30; // shorter challenge window for a snappier live demo (contract minimum)
 
 let running = false;
