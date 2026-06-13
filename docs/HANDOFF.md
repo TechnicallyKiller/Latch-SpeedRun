@@ -34,20 +34,25 @@ of every transaction we make safe, and we run the staked network that decides wh
 | Frontend landing (Swiss/technical design) | done | web/ |
 | Frontend Explorer (n8n-style per-job workflow tree) | done | /explorer |
 | Frontend Business page (full revenue/economics/risks) | done | /business |
+| Frontend Docs page (how-it-works + real-world) | done | /docs |
 | **One-click "Run a live job"** (SSE backend + live tree) | done | `agents/src/server.ts` + Explorer run-bar; real Fuji jobs stream node-by-node |
+| **Judge-as-buyer wallet flow** (connect → sign → withdraw) | done | `/post` + `agents/src/judge.ts` + `/api/judge-run`; judge funds with own USDC, refund to own wallet |
+| **Real AI provider agents** (honest vs confidently-wrong) | done | `agents/src/shared/ai.ts` `work()`; Groq Llama 3.3 (free) or Claude Haiku, deterministic fallback |
 
-**~82% toward a polished, judge-ready submission.** The hard/novel work is done; what's left is
-hosting + recording, not new protocol.
+**~90% toward a polished, judge-ready submission.** The hard/novel work + the two interactive flows
+are done; what's left is hosting + recording, not new protocol.
 
-### What's NOT done (next) — "put up the agents"
-1. **Host the live-run backend publicly (the one remaining build).** The one-click run works locally
-   but the Explorer points at a hardcoded `SERVER = "http://localhost:4030"` (`web/src/pages/Explorer.tsx`).
-   For the deployed site, the `agents/src/server.ts` SSE server must run on a public host (Railway /
-   Render / Fly / a small VM) with the funded demo `.env`, and the frontend must read the URL from an
-   env var (e.g. `VITE_LIVE_RUN_URL`) instead of localhost. CORS is already `*`. Then the "Run a live
-   job" buttons work for any judge, from the live site, with no local setup. **This is the next thing.**
-2. Connect-wallet "post your own job" + agent SDK/docs page.
-3. Recording, merge `staked-committee` -> `main`, docs/threat-model pass.
+### What's NOT done (next)
+1. **Host the live-run backend publicly (the one remaining build).** Both interactive flows work
+   locally but the frontend hits `SERVER` = `import.meta.env.VITE_LIVE_RUN_URL ?? "http://localhost:4030"`
+   (`web/src/pages/Explorer.tsx`, imported by `/post`). For the deployed site, run `agents/src/server.ts`
+   on a public host (Railway / Render / Fly / a small VM) with the funded demo `.env` (incl. GROQ_API_KEY),
+   and set `VITE_LIVE_RUN_URL` in the site build env. CORS is already `*`.
+2. **Smoke-test the full `/post` flow against Fuji in a browser** (connect wallet → scammer → withdraw
+   refund). Verified locally up to typecheck/build + a curl `/api/run`, but the 3-wallet-pop path needs
+   a real injected wallet. Demo accounts must hold a little AVAX + USDC (the `/api/faucet` drips from
+   DEPLOYER/BUYER).
+3. Agent SDK page (optional); recording; merge `staked-committee` -> `main`; docs/threat-model pass.
 
 ---
 
@@ -63,7 +68,9 @@ hosting + recording, not new protocol.
   (user's Alchemy key), `CHAIN_ID=43113`, `USDC_ADDRESS`, `LATCHJOB_ADDRESS`,
   `{DEPLOYER,BUYER,PROVIDER,PROVIDER2,VERIFIER}_PRIVATE_KEY`, `PINATA_JWT`, `JOB_AMOUNT=5000`
   (0.005 USDC), `PROVIDER_BOND=1000`, `CHALLENGE_BOND=1000`, `PROTOCOL_FEE_BPS=100`,
-  `CHALLENGE_WINDOW=60`.
+  `CHALLENGE_WINDOW=60`. **Optional AI keys** (picked in this order by `agents/src/shared/ai.ts`):
+  `GROQ_API_KEY` (free, no card, console.groq.com → Llama 3.3 70B) → `ANTHROPIC_API_KEY` (Claude
+  Haiku) → deterministic fallback. User currently has `GROQ_API_KEY` set, so real AI agents are live.
 
 ### Run commands (PATH must include `$HOME/.cargo/bin` and/or `$HOME/.foundry/bin`)
 ```
@@ -235,55 +242,49 @@ from the deployed site for any judge:
 
 ---
 
-## 10. THE WIN TASK: "judge as buyer" — full real wallet flow (build next)
+## 10. DONE: "judge as buyer" full real wallet flow (`/post`)
 
-**Why:** every other agent-payments demo is canned ("they press, you watch"). The thing that wins is
-making the JUDGE the buyer — their wallet, their real USDC, refunded to their wallet when a scammer is
-caught. Converts "test demo" → personal experience. User decision: **FULL & REAL, no MVP shortcut** —
-the judge signs the EIP-3009 payment themselves and the refund lands in their own wallet.
+Built and on `staked-committee`. The judge IS the buyer: their wallet, their real USDC, refunded to
+their wallet when a scammer is caught. Files:
+- `web/src/wallet.ts` — viem injected wallet (`custom(window.ethereum)`), enforces Fuji 43113
+  (switch/add chain), balances, `createJob`, EIP-3009 `signPayment`, `withdraw`.
+- `web/src/pages/Post.tsx` (route `/post`) — connect → faucet-drip → pick honest/scammer → judge
+  sends `createJob` (pop #1) → signs the EIP-3009 USDC payment (pop #2) → backend runs it, streamed
+  into the SAME workflow tree → on FAIL a banner offers **Withdraw** (pop #3) → USDC returns to wallet.
+- `web/src/live-job.ts` — shared `LiveStep`/`applyStep`/`readSSE` (Explorer refactored onto it).
+- `agents/src/judge.ts` + `POST /api/judge-run`, `/api/config`, `/api/faucet` in `server.ts`. The
+  backend only redeems the judge's signed authorization + runs provider/verify/finalize; it never
+  withdraws (the judge does, to their own wallet). Faucet drips AVAX+USDC from DEPLOYER/BUYER.
 
-**The on-chain flow already supports this** (see `agents/src/buyer.ts`):
-- `createJob(provider, amount, bond, commitment, 0, deadline, window)` — **msg.sender is the buyer**,
-  so the JUDGE must send this tx (gas only, no USDC moved) to be the on-chain buyer the refund is owed
-  to. `JobCreated` event → jobId.
-- Funding = judge signs USDC **`ReceiveWithAuthorization`** (EIP-3009) for `amount` to `LATCH`, bound
-  to `escrowNonce(jobId)`. Domain: name "USD Coin", version "2", chainId 43113, verifyingContract =
-  USDC. (Exact code: `agents/src/shared/eip3009.ts`.) Our **backend facilitator settles it**
-  (`fundJob` with the sig) — judge never needs to be the facilitator.
-- On FAIL: `finalize(jobId)` (anyone may call) credits `withdrawable[judge]`; **judge calls
-  `withdraw()`** → USDC lands back in their wallet. That `withdraw` tx is the emotional payoff.
+## 11. DONE: real AI provider agents (Groq/Claude)
 
-**Build steps (frontend-heavy; reuse existing backend):**
-1. **Wallet layer** (`web/src/wallet.ts`): viem injected wallet (`custom(window.ethereum)`), enforce
-   Fuji (43113) — `wallet_addEthereumChain`/`switchChain` if wrong. Expose connect, address, AVAX +
-   USDC balances (poll). Need USDC address + minimal LatchJob/USDC ABIs on the web side (copy the
-   needed fragments from `agents/src/shared/abi.ts`; USDC = `0x5425890298aed601595a70AB815c96711a31Bc65`).
-2. **Faucet-drip** to remove friction: a backend endpoint `POST /api/faucet {addr}` that, if the
-   address has < threshold, sends it a little **AVAX (gas)** + **test USDC** from the funded BUYER/
-   DEPLOYER account so a judge can run one job without hunting faucets. Idempotent / rate-limited.
-   (Keeps it "real" — still their wallet, their signature, real refund — just unblocks them.)
-3. **Post-your-own-job page** (`web/src/pages/Post.tsx`, route `/post`, nav CTA): connect → pick task
-   (small menu or free text) → choose provider **honest vs scammer** → amount (fixed tiny, e.g.
-   0.005 USDC). On submit: (a) judge sends `createJob` (wallet pop #1), (b) judge signs EIP-3009
-   payment (wallet pop #2) — POST sig+jobId+choice to a NEW backend endpoint, (c) backend streams the
-   run over SSE into the SAME workflow tree as Explorer (settle→accept→work→submit→verify→verdict→
-   finalize), (d) on FAIL the UI prompts **"Withdraw your refund"** → judge sends `withdraw` (wallet
-   pop #3) → show their USDC balance tick back up. THIS is the winning moment.
-4. **Backend endpoint** (`agents/src/server.ts`): `POST /api/judge-run` taking `{ jobId, payment(sig+auth),
-   mode }` → facilitator `settle`→`fundJob`, then run provider(mode)+verify+finalize, streaming the
-   same step events. Do NOT call buyer's `finalizeAndWithdraw` (that withdraws to OUR buyer) — only
-   `finalize`; the judge withdraws from their own wallet in the frontend.
+`agents/src/shared/ai.ts` `work(mode)` makes the providers genuine LLM agents instead of canned dicts.
+Honest agent gets the task clues → answers correctly; adversarial agent is denied them → confident,
+well-formed-WRONG output. Engine picked by env: `GROQ_API_KEY` (free Llama 3.3 70B) → `ANTHROPIC_API_KEY`
+(Claude Haiku) → deterministic fallback (demo never breaks). `engineName()` + the live deliverable are
+surfaced in the UI: an "AI engine" badge on `/explorer` + `/post`, and the agent's real answers on the
+Submit node. Both the one-click demo and the judge flow run through `work()`. **User has GROQ set →
+real AI is live** (verified: scammer returns varying wrong animals each run, proving it's not scripted).
 
-**UI/clarity upgrades (close the StackAI "feels alive" gap — animation, not theme):**
-- Animate the edge/connector with a flowing pulse from the just-completed node to the running one.
-- Stream the real artifact INTO each node as it lands (deliverable JSON into `submit`, `score 0/100`
-  into `verify`, tx hash fade-in) — mirrors StackAI's "View Results".
-- Node state snap: idle → amber pulse (running) → green/red (done). `.running` exists; add settle snap.
-- A small live counter (elapsed / tx count) during a run.
+## 12. DONE this session: finalize race fix + demo legibility
 
-**Pitch fix (kill "AI slop"):** lead with ONE wedge + ONE named buyer segment + ONE number, not the
-three-revenue-lines menu. Keep `/business` as the deep-dive; the HEADLINE is a single knife
-("refundable-on-failure payments for agent commerce — the Stripe Radar of agent work, starting with
-[one segment]"). The three revenue lines stay on `/business` as "how it monetizes," not the lead.
+- **Finalize race fix** (`agents/src/buyer.ts` `finalizeWithRetry`): a fixed off-chain sleep could
+  finish while the on-chain challenge window was still open → revert `ChallengeWindowOpen()` (selector
+  `0xfa7bc547`). Now detects that revert and waits it out; used by both live + judge flows; buffer bumped
+  to window+8s. Verified end-to-end (scammer job #18 settled).
+- **Demo legibility:** `/explorer` shows a JOB card (the task + 3 clues from `/api/config` + the
+  committed answer key + honest-vs-scammer outcomes). New **`/docs`** page (problem → 7-step loop →
+  components → 3 correctness tiers → real-world walkthrough → today-vs-scale). Nav: Docs, Live Demo,
+  Business, Post a job.
+- **Style:** em dashes removed across all pages (read less templated) — periods/commas instead.
 
-Then: recording, merge `staked-committee` -> `main`, short docs/threat-model pass.
+## 13. Still next
+
+1. **Host `agents/src/server.ts` publicly** (the one remaining build) + set `VITE_LIVE_RUN_URL` so both
+   interactive flows work from the deployed site. `.env` on the host needs GROQ_API_KEY + demo keys.
+2. **Browser smoke-test of `/post`** end-to-end against Fuji (3 wallet pops). Verified to typecheck/build
+   + a curl `/api/run`, but not yet driven with a real injected wallet.
+3. Recording; merge `staked-committee` → `main`; optional agent-SDK page; docs/threat-model pass.
+
+**Local run for both flows:** `cd agents && npm run server` (:4030, needs `$HOME/.cargo/bin` on PATH);
+`cd web && npm run dev` (:5173). Server is one-job-at-a-time; restart it after changing `.env`.
