@@ -8,6 +8,10 @@ RUN cargo build --release --manifest-path verifier/Cargo.toml --bin agent_verify
 FROM node:20-bookworm-slim
 WORKDIR /app
 
+# the Rust verifier makes HTTPS calls (RPC, Pinata); slim images omit root certs
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # verifier source (for any data files it reads) + the prebuilt binary
 COPY verifier ./verifier
 COPY --from=verifier-build /build/verifier/target/release/agent_verify ./verifier/target/release/agent_verify
