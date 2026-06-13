@@ -244,6 +244,7 @@ h2.title {
   padding: 11px 18px;
   border-radius: var(--radius);
   border: 1px solid var(--line-2);
+  background: transparent; /* <button> defaults to a light UA background otherwise */
   color: var(--text);
   transition: all 0.15s ease;
   cursor: pointer;

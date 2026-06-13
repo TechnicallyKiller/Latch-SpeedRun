@@ -77,6 +77,17 @@ export function Post() {
     }
   }
 
+  function chooseMode(m: "honest" | "fail") {
+    setMode(m);
+    // clear any finished-run result so it doesn't linger next to the new selection
+    if (phase === "done" || phase === "withdrawn" || phase === "error") {
+      setPhase("idle");
+      setRefund(0n);
+      setWithdrawTx(null);
+      setJob(null);
+    }
+  }
+
   async function runJob() {
     if (!w || phase === "running" || phase === "creating" || phase === "signing") return;
     setErr(null);
@@ -204,14 +215,14 @@ export function Post() {
             <button
               className={`btn ${mode === "honest" ? "btn-primary" : ""}`}
               disabled={busy}
-              onClick={() => setMode("honest")}
+              onClick={() => chooseMode("honest")}
             >
               Honest provider
             </button>
             <button
               className={`btn ${mode === "fail" ? "btn-primary" : ""}`}
               disabled={busy}
-              onClick={() => setMode("fail")}
+              onClick={() => chooseMode("fail")}
             >
               Scammer provider
             </button>
