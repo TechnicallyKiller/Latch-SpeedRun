@@ -1,5 +1,5 @@
 // Two real jobs from the live committee contract on Fuji (0xa5cA9c…). Hardcoded tx hashes so the
-// explorer loads instantly and still links to real on-chain proof — no chain scanning needed.
+// explorer loads instantly and still links to real on-chain proof, no chain scanning needed.
 
 export const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
 

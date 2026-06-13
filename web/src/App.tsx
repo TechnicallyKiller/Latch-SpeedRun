@@ -76,7 +76,7 @@ function Hero() {
             Escrow that releases only when the work is <span className="red">verifiably correct</span>.
           </h1>
           <p className="lead">
-            When one agent pays another, today’s escrow releases on shape — valid JSON, no 5xx. A
+            When one agent pays another, today’s escrow releases on shape, valid JSON, no 5xx. A
             provider that returns well-formed garbage still gets paid. Latch settles against a real,
             evidence-backed correctness verdict from a staked verifier set.
           </p>
@@ -191,7 +191,7 @@ function Loop() {
         <div>
           <h2 className="title">Verify, then settle.</h2>
           <p className="lead" style={{ margin: "16px 0 36px" }}>
-            A short challenge window — justified by Avalanche’s ~1s finality — backs an optimistic
+            A short challenge window, justified by Avalanche’s ~1s finality, backs an optimistic
             release, with bonds and a dispute path bounding the trust.
           </p>
           <div className="flow">
@@ -225,11 +225,11 @@ function Trust() {
             <div>
               <p className="lead">
                 Verifiers stake collateral to judge. A verdict isn’t valid until a quorum of them
-                independently agree and co-sign it — and if it’s overturned, every signer is slashed.
+                independently agree and co-sign it, and if it’s overturned, every signer is slashed.
                 Stake locks while a verdict is pending, so they can’t sign and run.
               </p>
               <p className="lead" style={{ marginTop: 18 }}>
-                Because the checks are deterministic, honest verifiers always agree — so a
+                Because the checks are deterministic, honest verifiers always agree, so a
                 disagreement is itself provable evidence of fault, replayable from the public record.
                 “Trust the referee?” becomes “they lose money if they lie.”
               </p>
@@ -290,7 +290,7 @@ function Model() {
 function Footer() {
   return (
     <footer className="foot wrap">
-      <span>Latch — verifiable settlement for agent commerce</span>
+      <span>Latch, verifiable settlement for agent commerce</span>
       <span>Built on Avalanche</span>
     </footer>
   );

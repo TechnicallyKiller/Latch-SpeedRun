@@ -89,7 +89,7 @@ export function Explorer() {
           <span className="eyebrow">Live demo</span>
           <h1 className="exp-title">Watch a real job settle, step by step.</h1>
           <p className="lead">
-            Press a button below and Latch runs a <b>real job on Fuji</b> — no wallet needed. Each
+            Press a button below and Latch runs a <b>real job on Fuji</b>, no wallet needed. Each
             node lights up as it lands on-chain; click one for the exact code (Rust → Solidity) and
             the live transaction. Below the run are two jobs already settled on-chain you can inspect.
           </p>
@@ -107,7 +107,7 @@ export function Explorer() {
         <p className="lead" style={{ margin: "10px 0 18px", fontSize: 16 }}>
           A buyer hires an AI agent to <b>classify three clues</b> into the single animal each
           describes. The correct answers (<span className="mono">cat · dog · bird</span>) are committed
-          on-chain as a hidden answer key <i>before</i> any work starts — so the provider can't see the
+          on-chain as a hidden answer key <i>before</i> any work starts, so the provider can't see the
           test and the buyer can't change it after.
         </p>
         <div className="job-clues">
@@ -152,7 +152,7 @@ export function Explorer() {
       </div>
 
       <div className="exp-sublabel mono">
-        {live ? "Your live run — and two reference jobs settled earlier on Fuji:" : "Two reference jobs already settled on Fuji — every hash is real and clickable:"}
+        {live ? "Your live run, and two reference jobs settled earlier on Fuji:" : "Two reference jobs already settled on Fuji, every hash is real and clickable:"}
       </div>
       <div className="exp-tabs">
         {jobs.map((j, i) => {

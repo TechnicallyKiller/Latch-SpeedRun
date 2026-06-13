@@ -24,8 +24,8 @@ export function Business() {
           <p className="lead">
             Latch is the trust-and-settlement rail for the agent economy. The money is in
             throughput, not margin: the take-rate stays low because agent payments are small and
-            price-sensitive, so the value is in the total volume of agent commerce settled — and
-            verified — through Latch.
+            price-sensitive, so the value is in the total volume of agent commerce settled, and
+            verified, through Latch.
           </p>
         </div>
       </header>
@@ -39,7 +39,7 @@ export function Business() {
             <p>
               The verifier is the IP. “You run agents, we run the referee.” Per-verification pricing
               or a subscription, plus custom policy authoring for enterprises. Earns money before a
-              large agent economy exists — teams running agent fleets need this today.
+              large agent economy exists, teams running agent fleets need this today.
             </p>
           </div>
           <div className="card">
@@ -76,11 +76,11 @@ export function Business() {
         </div>
         <p className="lead" style={{ marginTop: 20 }}>
           Honest, competent operators profit; lazy or dishonest ones are slashed and exit. Because
-          verification is deterministic, slashing is objective — disagreement with the public
+          verification is deterministic, slashing is objective, disagreement with the public
           evidence is provable, not a vote.{" "}
           <span style={{ color: "var(--text-faint)" }}>
             (Status: the fee primitive and staking/slashing are built; the fee-to-verifier split is
-            the designed incentive, not yet coded — today the fee accrues to the protocol.)
+            the designed incentive, not yet coded, today the fee accrues to the protocol.)
           </span>
         </p>
       </Row>
@@ -91,7 +91,7 @@ export function Business() {
           <div className="card">
             <h3>Buyers</h3>
             <p>
-              The fee is cheap insurance against paying full price for garbage — trivially worth it
+              The fee is cheap insurance against paying full price for garbage, trivially worth it
               versus the downside of an unverified deliverable.
             </p>
           </div>
@@ -99,19 +99,19 @@ export function Business() {
             <h3>Honest providers</h3>
             <p>
               Verifiable correctness lets them beat cheaper scammers. It creates a market that
-              rewards quality — which low-quality competitors can't game.
+              rewards quality, which low-quality competitors can't game.
             </p>
           </div>
         </div>
         <div className="compare">
-          <div className="cmp"><span className="cmp-k mono">Stripe</span><span className="cmp-v">payment rail, ~2.9%/tx — moves money, doesn't verify substance</span></div>
-          <div className="cmp"><span className="cmp-k mono">Upwork / Escrow.com</span><span className="cmp-v">human escrow + dispute, 5–20% — Latch automates the “was it correct?” judgment, no human</span></div>
-          <div className="cmp"><span className="cmp-k mono">Chainlink</span><span className="cmp-v">oracle network — Latch is an oracle for correctness, not price</span></div>
+          <div className="cmp"><span className="cmp-k mono">Stripe</span><span className="cmp-v">payment rail, ~2.9%/tx, moves money, doesn't verify substance</span></div>
+          <div className="cmp"><span className="cmp-k mono">Upwork / Escrow.com</span><span className="cmp-v">human escrow + dispute, 5–20%. Latch automates the “was it correct?” judgment, no human</span></div>
+          <div className="cmp"><span className="cmp-k mono">Chainlink</span><span className="cmp-v">oracle network. Latch is an oracle for correctness, not price</span></div>
         </div>
       </Row>
 
       <Row index="04" name="Path">
-        <h2 className="title">Phasing — and the honest risks.</h2>
+        <h2 className="title">Phasing, and the honest risks.</h2>
         <ol className="phases">
           <li><b>Grants</b> fund the build and prove the loop on-chain.</li>
           <li><b>Hosted verification (SaaS)</b> for early cash and IP validation.</li>
@@ -120,14 +120,14 @@ export function Business() {
         </ol>
         <p className="lead" style={{ marginTop: 26, color: "var(--text-dim)" }}>
           Risk, stated plainly: agent-to-agent commerce at scale is forming, not formed (x402 /
-          ERC-8004 / ERC-8183 are early), so the take-rate play is a bet on that market emerging —
-          the SaaS line funds the company while it matures. A token is optional and not assumed; the
+          ERC-8004 / ERC-8183 are early), so the take-rate play is a bet on that market emerging.
+          The SaaS line funds the company while it matures. A token is optional and not assumed; the
           fee + SaaS model stands without one.
         </p>
       </Row>
 
       <footer className="foot wrap">
-        <span>Latch — verifiable settlement for agent commerce</span>
+        <span>Latch, verifiable settlement for agent commerce</span>
         <span>Built on Avalanche</span>
       </footer>
     </div>

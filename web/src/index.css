@@ -1,5 +1,5 @@
 /* ============================================================
-   Latch design system — Swiss / technical infrastructure
+   Latch design system. Swiss / technical infrastructure
    Refined grotesk, rigorous grid, generous whitespace,
    monospace for data + labels, red used sparingly as signal.
    ============================================================ */
@@ -11,7 +11,7 @@
   --line: rgba(255, 255, 255, 0.07);
   --line-2: rgba(255, 255, 255, 0.13);
 
-  --red: #e84142; /* Avalanche red — used as signal, not decoration */
+  --red: #e84142; /* Avalanche red, used as signal, not decoration */
   --red-bright: #f5575a;
   --red-wash: rgba(232, 65, 66, 0.08);
 
@@ -290,7 +290,7 @@ h2.title {
   position: relative;
 }
 .hero::before {
-  /* one restrained red glow, low and off-axis — a hint, not a gradient banner */
+  /* one restrained red glow, low and off-axis, a hint, not a gradient banner */
   content: "";
   position: absolute;
   top: -120px;

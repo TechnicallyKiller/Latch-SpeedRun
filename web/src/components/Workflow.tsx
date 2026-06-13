@@ -31,7 +31,7 @@ export function Workflow({
             <span className="fn-title">{s.title}</span>
             <span className="fn-foot">
               <span className={`fn-dot d-${s.status}`} />
-              <span className="fn-tag">{s.tx ? "on-chain" : s.actor === "verifier" && s.key === "verify" ? "off-chain · rust" : s.status === "context" ? "context" : "—"}</span>
+              <span className="fn-tag">{s.tx ? "on-chain" : s.actor === "verifier" && s.key === "verify" ? "off-chain · rust" : s.status === "context" ? "context" : "-"}</span>
             </span>
           </button>
           {i < steps.length - 1 && <span className="flow-arrow" aria-hidden />}

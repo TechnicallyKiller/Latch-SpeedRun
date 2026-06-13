@@ -88,7 +88,7 @@ export function Post() {
       const amount = BigInt(cfg.amount);
       const bond = BigInt(cfg.bond);
 
-      // 1) judge creates the job on-chain (wallet pop #1) — they are the buyer
+      // 1) judge creates the job on-chain (wallet pop #1), they are the buyer
       setPhase("creating");
       let j = emptyLive(`Your job · ${mode === "fail" ? "scammer provider" : "honest provider"}`, amount, bond);
       setJob(j);
@@ -131,7 +131,7 @@ export function Post() {
       setRunning(null);
       setPhase("done");
       await refresh(w, cfg);
-      // if it failed, a refund is owed to the judge — surface the withdraw
+      // if it failed, a refund is owed to the judge, surface the withdraw
       const owed = await withdrawableOf(w, cfg.latch);
       setRefund(owed);
     } catch (e: any) {
@@ -166,7 +166,7 @@ export function Post() {
           <p className="lead">
             Connect your wallet on Fuji and hire an agent with <b>your own testnet USDC</b>. Send it to
             a provider that cheats and watch Latch catch it: the scammer's bond is slashed and{" "}
-            <b>your money is refunded to your wallet</b>. No mock data — every step is a real
+            <b>your money is refunded to your wallet</b>. No mock data, every step is a real
             transaction you sign.
           </p>
         </div>
@@ -238,7 +238,7 @@ export function Post() {
           </div>
         )}
         {phase === "done" && refund === 0n && job?.settled?.pass && (
-          <span className="run-status mono ok">Work verified correct — provider paid. ✓</span>
+          <span className="run-status mono ok">Work verified correct, provider paid. ✓</span>
         )}
         {phase === "withdrawn" && (
           <span className="run-status mono ok">

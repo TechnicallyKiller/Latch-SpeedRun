@@ -52,7 +52,7 @@ export function buildSteps(job: Job): Step[] {
       tx: job.funded?.tx,
       summary: "Buyer pays over HTTP 402; the payment is settled into escrow.",
       detail:
-        "The provider gateway returns HTTP 402 Payment Required. The buyer signs an EIP-3009 USDC authorization (the X-PAYMENT header) bound to this job's nonce. Latch's own facilitator redeems it into the escrow — receiveWithAuthorization is caller-bound, so the funds can only land in the escrow, and the job-bound nonce stops any replay.",
+        "The provider gateway returns HTTP 402 Payment Required. The buyer signs an EIP-3009 USDC authorization (the X-PAYMENT header) bound to this job's nonce. Latch's own facilitator redeems it into the escrow, receiveWithAuthorization is caller-bound, so the funds can only land in the escrow, and the job-bound nonce stops any replay.",
       code: [
         { lang: "ts", ref: "agents/facilitator.ts → settle()", note: "verifies + relays the x402 payment" },
         { lang: "sol", ref: "LatchJob.fundJob()", note: "redeems the EIP-3009 authorization" },
@@ -80,7 +80,7 @@ export function buildSteps(job: Job): Step[] {
       tx: job.submitted?.tx,
       summary: "An AI agent does the work and submits a fingerprint of the deliverable.",
       detail:
-        "The provider is a real LLM agent. The honest one is given the task and answers correctly; the adversarial one is denied the source and returns well-formed-but-wrong answers — confident garbage that shape-only escrow would happily pay for. It submits a hash of its deliverable on-chain; the payload itself stays off-chain.",
+        "The provider is a real LLM agent. The honest one is given the task and answers correctly; the adversarial one is denied the source and returns well-formed-but-wrong answers, confident garbage that shape-only escrow would happily pay for. It submits a hash of its deliverable on-chain; the payload itself stays off-chain.",
       code: [
         { lang: "ts", ref: "agents/shared/ai.ts → work()", note: "the LLM agent produces the deliverable" },
         { lang: "ts", ref: "agents/provider.ts → /hire", note: "submits the deliverable hash" },
@@ -100,7 +100,7 @@ export function buildSteps(job: Job): Step[] {
       status: v ? outcomeStatus : "idle",
       summary: "A staked verifier scores the deliverable against the secret answer key.",
       detail:
-        "This is the core IP, off-chain in Rust. The verifier reveals the committed sample, scores the provider's actual answers against the known labels, computes a pass/fail + score, assembles public evidence, and signs an EIP-712 verdict. The check is deterministic, so every honest verifier produces an identical verdict — a disagreement is itself provable evidence of fault.",
+        "This is the core IP, off-chain in Rust. The verifier reveals the committed sample, scores the provider's actual answers against the known labels, computes a pass/fail + score, assembles public evidence, and signs an EIP-712 verdict. The check is deterministic, so every honest verifier produces an identical verdict, a disagreement is itself provable evidence of fault.",
       code: [
         { lang: "rust", ref: "policy::GroundTruthPolicy::evaluate()", note: "scores answers vs the answer key" },
         { lang: "rust", ref: "run_verification()", note: "enforces the commit-reveal, then signs" },
@@ -114,7 +114,7 @@ export function buildSteps(job: Job): Step[] {
       actor: "verifier",
       status: v ? outcomeStatus : "idle",
       tx: v?.tx,
-      summary: "The signed verdict is posted on-chain — a k-of-n staked quorum.",
+      summary: "The signed verdict is posted on-chain, a k-of-n staked quorum.",
       detail:
         "The contract recovers each signature, requires a quorum of distinct active (staked) verifiers, records the verdict and its evidence, and opens a short challenge window. An overturned verdict later slashes every signer.",
       code: [
@@ -131,7 +131,7 @@ export function buildSteps(job: Job): Step[] {
       tx: job.settled?.tx,
       summary: "After the challenge window elapses, the escrow settles.",
       detail:
-        "Once the window passes with no challenge, anyone can finalize. The contract settles the escrow according to the verdict — release on pass, refund + slash on fail — in seconds, thanks to Avalanche's fast finality.",
+        "Once the window passes with no challenge, anyone can finalize. The contract settles the escrow according to the verdict, release on pass, refund + slash on fail, in seconds, thanks to Avalanche's fast finality.",
       code: [{ lang: "sol", ref: "LatchJob.finalize() → _settle()", note: "optimistic settlement" }],
     },
     {
@@ -148,7 +148,7 @@ export function buildSteps(job: Job): Step[] {
             : "Awaiting settlement.",
       detail:
         passed === false
-          ? "On a FAIL, the escrow refunds the buyer the full amount and slashes the provider's bond to the buyer as compensation. The provider that returned well-formed garbage gets nothing — the exact case every shape-only escrow pays out on."
+          ? "On a FAIL, the escrow refunds the buyer the full amount and slashes the provider's bond to the buyer as compensation. The provider that returned well-formed garbage gets nothing, the exact case every shape-only escrow pays out on."
           : "On a PASS, the provider receives the amount minus a small protocol fee, and its bond is returned. The buyer got verifiably correct work.",
       code: [{ lang: "sol", ref: passed === false ? "_settle(false)" : "_settle(true)", note: "credits the pull-payment ledger" }],
       data: job.settled
@@ -164,7 +164,7 @@ export function buildSteps(job: Job): Step[] {
       status: "context",
       summary: "The buyer records feedback about the provider in the ERC-8004 registry.",
       detail:
-        "After settlement the buyer writes feedback to the canonical ERC-8004 Reputation registry, referencing the verdict evidence. Honest providers' reputation climbs; a caught scammer's drops to zero — and the buyer reads that reputation to choose who to hire next time.",
+        "After settlement the buyer writes feedback to the canonical ERC-8004 Reputation registry, referencing the verdict evidence. Honest providers' reputation climbs; a caught scammer's drops to zero, and the buyer reads that reputation to choose who to hire next time.",
       code: [{ lang: "ts", ref: "agents/erc8004.ts → giveFeedback()", note: "writes on-chain reputation" }],
     },
   ];

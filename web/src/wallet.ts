@@ -74,7 +74,7 @@ export async function balances(w: Wallet, usdc: Address): Promise<{ avax: bigint
   return { avax, usdc: bal };
 }
 
-/** The judge creates the job on-chain — msg.sender (them) becomes the buyer the refund is owed to. */
+/** The judge creates the job on-chain, msg.sender (them) becomes the buyer the refund is owed to. */
 export async function createJob(
   w: Wallet,
   latch: Address,
@@ -101,7 +101,7 @@ export interface SignedPayment {
   s: `0x${string}`;
 }
 
-/** The judge signs the USDC ReceiveWithAuthorization — the real payment, from their own balance. */
+/** The judge signs the USDC ReceiveWithAuthorization, the real payment, from their own balance. */
 export async function signPayment(
   w: Wallet,
   args: { usdc: Address; latch: Address; jobId: bigint; amount: bigint },
@@ -142,7 +142,7 @@ export async function withdrawableOf(w: Wallet, latch: Address): Promise<bigint>
   return w.pub.readContract({ address: latch, abi: latchAbi, functionName: "withdrawable", args: [w.address] }) as Promise<bigint>;
 }
 
-/** Judge pulls their refund — the USDC lands back in their wallet. The payoff moment. */
+/** Judge pulls their refund, the USDC lands back in their wallet. The payoff moment. */
 export async function withdraw(w: Wallet, latch: Address): Promise<`0x${string}`> {
   const tx = await w.wallet.writeContract({ account: w.address, chain: avalancheFuji, address: latch, abi: latchAbi, functionName: "withdraw", args: [] });
   await w.pub.waitForTransactionReceipt({ hash: tx });
