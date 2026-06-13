@@ -1,0 +1,46 @@
+# Render blueprint for the Latch agent server (free tier, no credit card).
+# Render builds the Dockerfile (Node + the Rust verifier) and serves it over HTTPS.
+# The secret values (sync:false) are entered once in the Render dashboard, never committed.
+services:
+  - type: web
+    name: latch-engine
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: CHAIN_ID
+        value: 43113
+      - key: JOB_AMOUNT
+        value: 5000
+      - key: PROVIDER_BOND
+        value: 1000
+      - key: CHALLENGE_BOND
+        value: 1000
+      - key: PROTOCOL_FEE_BPS
+        value: 100
+      - key: CHALLENGE_WINDOW
+        value: 60
+      # --- secrets: paste these in the Render dashboard (Environment tab) ---
+      - key: FUJI_RPC_URL
+        sync: false
+      - key: USDC_ADDRESS
+        sync: false
+      - key: LATCHJOB_ADDRESS
+        sync: false
+      - key: DEPLOYER_PRIVATE_KEY
+        sync: false
+      - key: BUYER_PRIVATE_KEY
+        sync: false
+      - key: PROVIDER_PRIVATE_KEY
+        sync: false
+      - key: PROVIDER2_PRIVATE_KEY
+        sync: false
+      - key: VERIFIER_PRIVATE_KEY
+        sync: false
+      - key: PINATA_JWT
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
