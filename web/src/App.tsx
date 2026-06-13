@@ -2,6 +2,7 @@ import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
 import { Explorer } from "./pages/Explorer";
 import { Business } from "./pages/Business";
 import { Post } from "./pages/Post";
+import { Docs } from "./pages/Docs";
 
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
 const SNOWTRACE = `https://testnet.snowtrace.io/address/${LATCH}`;
@@ -15,7 +16,7 @@ function Nav() {
           Latch
         </Link>
         <div className="nav-links">
-          <a href="/#loop">How it works</a>
+          <Link to="/docs">Docs</Link>
           <Link to="/explorer">Live Demo</Link>
           <Link to="/business">Business</Link>
           <a className="pill" href={SNOWTRACE} target="_blank" rel="noreferrer">
@@ -316,6 +317,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/explorer" element={<Explorer />} />
         <Route path="/post" element={<Post />} />
+        <Route path="/docs" element={<Docs />} />
         <Route path="/business" element={<Business />} />
       </Routes>
     </BrowserRouter>

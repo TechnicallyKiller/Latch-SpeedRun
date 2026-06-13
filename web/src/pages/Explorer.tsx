@@ -21,11 +21,15 @@ export function Explorer() {
   const [idx, setIdx] = useState(0);
   const [selKey, setSelKey] = useState("create");
   const [engine, setEngine] = useState<string | null>(null);
+  const [task, setTask] = useState<Record<string, string> | null>(null);
 
   useEffect(() => {
     fetch(`${SERVER}/api/config`)
       .then((r) => r.json())
-      .then((c) => setEngine(c.engine))
+      .then((c) => {
+        setEngine(c.engine);
+        setTask(c.task ?? null);
+      })
       .catch(() => setEngine(null));
   }, []);
 
@@ -94,6 +98,40 @@ export function Explorer() {
           <span className="live" /> {LATCH.slice(0, 10)}…{LATCH.slice(-6)} ↗
         </a>
       </header>
+
+      <div className="job-card">
+        <div className="job-card-head">
+          <span className="label"><span className="i">JOB</span>What the agent is hired to do</span>
+          <a className="job-docs" href="/docs">How it all works ↗</a>
+        </div>
+        <p className="lead" style={{ margin: "10px 0 18px", fontSize: 16 }}>
+          A buyer hires an AI agent to <b>classify three clues</b> into the single animal each
+          describes. The correct answers (<span className="mono">cat · dog · bird</span>) are committed
+          on-chain as a hidden answer key <i>before</i> any work starts — so the provider can't see the
+          test and the buyer can't change it after.
+        </p>
+        <div className="job-clues">
+          {task ? (
+            Object.entries(task).map(([k, v]) => (
+              <div className="clue" key={k}>
+                <span className="clue-k mono">{k}</span>
+                <span className="clue-v">{v}</span>
+              </div>
+            ))
+          ) : (
+            <div className="clue"><span className="clue-v">Loading the task…</span></div>
+          )}
+        </div>
+        <div className="job-modes">
+          <div className="job-mode pass">
+            <b>Honest provider</b> reads the clues → answers correctly → verifier passes it → it gets paid.
+          </div>
+          <div className="job-mode fail">
+            <b>Scammer provider</b> is denied the clues → returns confident, well-formed garbage →
+            verifier fails it → bond slashed, buyer refunded.
+          </div>
+        </div>
+      </div>
 
       <div className="run-bar">
         <span className="run-label">Run a live job:</span>
