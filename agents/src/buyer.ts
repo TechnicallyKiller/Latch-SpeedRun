@@ -76,11 +76,37 @@ export async function hire(opts: {
   return { jobId, deliverable: body.deliverable, engine: body.engine, createTx, txs: body.txs };
 }
 
+// LatchJob.ChallengeWindowOpen() selector — finalize reverts with this if the window hasn't closed yet.
+const CHALLENGE_WINDOW_OPEN = "0xfa7bc547";
+
+/**
+ * Finalize, retrying while the challenge window is still open on-chain. Block timestamps and tx
+ * latency mean a fixed off-chain sleep can race the window; this waits it out deterministically.
+ */
+export async function finalizeWithRetry(
+  wallet: ReturnType<typeof walletFor>,
+  jobId: bigint,
+  maxWaitMs = 90_000,
+): Promise<`0x${string}`> {
+  const start = Date.now();
+  for (;;) {
+    try {
+      const tx = await wallet.writeContract({ address: LATCH, abi: latchAbi, functionName: "finalize", args: [jobId] });
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+      return tx;
+    } catch (e) {
+      const msg = String((e as any)?.cause?.data ?? (e as any)?.shortMessage ?? (e as any)?.message ?? e);
+      const windowStillOpen = msg.includes(CHALLENGE_WINDOW_OPEN) || msg.includes("ChallengeWindowOpen");
+      if (!windowStillOpen || Date.now() - start > maxWaitMs) throw e;
+      await new Promise((r) => setTimeout(r, 6000)); // wait for the window to close, then retry
+    }
+  }
+}
+
 /** After settlement, the buyer finalizes (anyone may) and withdraws any refund owed. */
 export async function finalizeAndWithdraw(jobId: bigint) {
   const buyer = walletFor(keys.buyer);
-  const finalizeTx = await buyer.writeContract({ address: LATCH, abi: latchAbi, functionName: "finalize", args: [jobId] });
-  await publicClient.waitForTransactionReceipt({ hash: finalizeTx });
+  const finalizeTx = await finalizeWithRetry(buyer, jobId);
 
   const owed = (await publicClient.readContract({
     address: LATCH,

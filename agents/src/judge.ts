@@ -1,6 +1,7 @@
 import { latchAbi, usdcAbi } from "./shared/abi.js";
 import { LATCH, USDC, amounts, addrOf, keys, publicClient, walletFor } from "./shared/config.js";
 import { verifyDeliverable } from "./shared/verifier-runner.js";
+import { finalizeWithRetry } from "./buyer.js";
 import { acceptJob, submitDeliverable } from "./provider.js";
 import { work } from "./shared/ai.js";
 import type { LiveStep } from "./live.js";
@@ -69,9 +70,8 @@ export async function runJudgeJob(p: JudgePayment, emit: (s: LiveStep) => void):
 
   // 4) finalize after the challenge window — but DO NOT withdraw (the judge withdraws their own refund)
   emit({ key: "finalize", status: "running", note: `waiting ${p.window}s for the challenge window` });
-  await sleep((p.window + 5) * 1000);
-  const finTx = await facilitator.writeContract({ address: LATCH, abi: latchAbi, functionName: "finalize", args: [jobId] });
-  await publicClient.waitForTransactionReceipt({ hash: finTx });
+  await sleep((p.window + 8) * 1000);
+  const finTx = await finalizeWithRetry(facilitator, jobId);
   emit({ key: "finalize", status: "done", tx: finTx });
   emit({ key: "outcome", status: verdict, tx: finTx });
 

@@ -52,7 +52,7 @@ export async function runLiveJob(
   emit({ key: "verdict", status: verdict, tx: v.tx });
 
   emit({ key: "finalize", status: "running", note: `waiting ${opts.window}s for the challenge window` });
-  await sleep((opts.window + 5) * 1000);
+  await sleep((opts.window + 8) * 1000);
   const fin = await finalizeAndWithdraw(r.jobId);
   emit({ key: "finalize", status: "done", tx: fin.finalizeTx });
   emit({ key: "outcome", status: verdict, tx: fin.finalizeTx });
