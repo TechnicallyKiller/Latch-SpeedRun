@@ -11,7 +11,7 @@ commodity; the verifier and the optimistic settlement around it are the work.
 
 ## Try it live
 
-**Live site:** https://REPLACE-WITH-YOUR-SITE.netlify.app
+**Live site:** (https://latch-avax.netlify.app/)
 
 It's not a mockup — every action is a real transaction on Avalanche Fuji:
 
