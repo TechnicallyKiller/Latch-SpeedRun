@@ -23,6 +23,7 @@ function Nav() {
           <Link to="/docs">Docs</Link>
           <Link to="/sdk">SDK</Link>
           <Link to="/security">Security</Link>
+          <Link to="/marketplace">Marketplace</Link>
           <Link to="/explorer">Live Demo</Link>
           <Link to="/business">Business</Link>
           <a className="pill" href={SNOWTRACE} target="_blank" rel="noreferrer">
