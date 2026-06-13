@@ -22,6 +22,10 @@ export function Explorer() {
   const [selKey, setSelKey] = useState("create");
   const [engine, setEngine] = useState<string | null>(null);
   const [task, setTask] = useState<Record<string, string> | null>(null);
+  const [windowSec, setWindowSec] = useState(30);
+  const [balances, setBalances] = useState<{ buyer: string; provider: string } | null>(null);
+  const [flash, setFlash] = useState(0); // bumps on each balance update to retrigger the flash anim
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`${SERVER}/api/config`)
@@ -29,9 +33,21 @@ export function Explorer() {
       .then((c) => {
         setEngine(c.engine);
         setTask(c.task ?? null);
+        if (c.window) setWindowSec(c.window);
       })
       .catch(() => setEngine(null));
   }, []);
+
+  // countdown during the challenge window so the wait reads as intentional, not a hang
+  useEffect(() => {
+    if (running !== "finalize") {
+      setCountdown(null);
+      return;
+    }
+    setCountdown(windowSec);
+    const id = setInterval(() => setCountdown((c) => (c === null ? null : Math.max(0, c - 1))), 1000);
+    return () => clearInterval(id);
+  }, [running, windowSec]);
 
   const jobs = useMemo(() => (live ? [live, ...JOBS] : JOBS), [live]);
   const job = jobs[Math.min(idx, jobs.length - 1)];
@@ -48,6 +64,7 @@ export function Explorer() {
     setPhase("running");
     setErrMsg(null);
     setRunning(null);
+    setBalances(null);
 
     const es = new EventSource(`${SERVER}/api/run?mode=${mode}`);
     esRef.current = es;
@@ -55,6 +72,10 @@ export function Explorer() {
 
     es.addEventListener("step", (e) => {
       const s = JSON.parse((e as MessageEvent).data) as LiveStep;
+      if (s.balances) {
+        setBalances(s.balances);
+        setFlash((f) => f + 1);
+      }
       if (s.status === "running") setRunning(s.key);
       else {
         setRunning((r) => (r === s.key ? null : r));
@@ -150,6 +171,29 @@ export function Explorer() {
           </span>
         )}
       </div>
+
+      {(balances || countdown !== null) && (
+        <div className="live-meter">
+          {balances && (
+            <>
+              <div key={`b${flash}`} className="meter-cell flash">
+                <span className="meter-k mono">buyer wallet</span>
+                <span className="meter-v mono">{usdc(BigInt(balances.buyer))}</span>
+              </div>
+              <div key={`p${flash}`} className="meter-cell flash">
+                <span className="meter-k mono">provider wallet</span>
+                <span className="meter-v mono">{usdc(BigInt(balances.provider))}</span>
+              </div>
+            </>
+          )}
+          {countdown !== null && (
+            <div className="meter-cell live-countdown">
+              <span className="meter-k mono">challenge window</span>
+              <span className="meter-v mono">{countdown}s</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="exp-sublabel mono">
         {live ? "Your live run, and two reference jobs settled earlier on Fuji:" : "Two reference jobs already settled on Fuji, every hash is real and clickable:"}

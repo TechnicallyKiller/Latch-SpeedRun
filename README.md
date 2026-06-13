@@ -9,6 +9,24 @@ ERC-8183-style escrow consumes to release or refund. Payment rails (x402),
 identity and reputation (ERC-8004), and the job/escrow shape (ERC-8183) are the
 commodity; the verifier and the optimistic settlement around it are the work.
 
+## Try it live
+
+**Live site:** https://REPLACE-WITH-YOUR-SITE.netlify.app
+
+It's not a mockup — every action is a real transaction on Avalanche Fuji:
+
+- **Live Demo** (`/explorer`) — press one button and watch a real job settle on-chain, node by
+  node, with Snowtrace links. The provider is a **real LLM agent** (Llama 3.3 via Groq): the honest
+  one reads the task and is correct; the "scammer" is denied the answer key and returns confident,
+  well-formed garbage — and gets caught.
+- **Post a job** (`/post`) — **connect your wallet, pay real testnet USDC**, send the work to a
+  scammer, and watch the verifier slash its bond and **refund the money to your own wallet**. You are
+  the buyer; nothing is faked.
+- **Docs · SDK · Security · Business** pages explain the mechanism, how to integrate an agent, the
+  threat model, and how it monetizes.
+
+Contract (LatchJob) on Fuji: `0xa5cA9c7920F22E1104215C430227756dEBBb2a09`.
+
 ## Why it is different
 
 - x402 answers *can agents pay each other*.
@@ -35,9 +53,11 @@ Four layers:
    assembles public evidence, signs it, and submits it on-chain. Policies:
    JSON_SCHEMA, GROUND_TRUTH_SAMPLE (commit-reveal, the anti-garbage core),
    STATISTICAL_BOUNDS, DETERMINISTIC_HASH, TEST_SUITE.
-3. **Agents** (`agents/`, TypeScript). Autonomous buyer and provider agents
-   (including an adversarial provider for the demo) that discover via ERC-8004,
-   fund via x402, and settle.
+3. **Agents** (`agents/`, TypeScript). Autonomous buyer and provider agents that discover via
+   ERC-8004, fund via x402, and settle. The providers are **real LLM agents** (Groq Llama 3.3 or
+   Claude, with a deterministic fallback): an honest agent that does the work, and an adversarial
+   one that returns confident, well-formed-but-wrong output. A small SSE server (`server.ts`) runs
+   one real job on demand and streams each step to the dashboard.
 4. **Dashboard** (`web/`, React). A live agent-commerce explorer reading
    on-chain state and events: jobs, verdicts, evidence, reputation, the
    challenge window, and settlement. Includes a dedicated **business model**
@@ -124,13 +144,16 @@ Real and tested now:
   asserted end-to-end — an honest deliverable pays the provider, and well-formed
   garbage refunds the buyer and slashes the provider's bond.
 
+- The same loop **live on Fuji** end-to-end: the real x402 HTTP layer (Latch is its own
+  facilitator), ERC-8004 registry wiring, the autonomous agents, real LLM providers, IPFS-pinned
+  evidence, and the dashboard. Deployed and runnable from the live site by anyone.
+- The **staked verifier committee** (k-of-n quorum, stake, slash on overturn).
+
 Designed-for, not yet built:
 
-- The same loop on Fuji, the x402 HTTP layer, ERC-8004 registry wiring, agents,
-  and dashboard.
-- IPFS-backed evidence (the local store implements the same interface today).
-- Staked verifier set / staked jurors, ERC-4626 bond vault, confidential
-  settlement via Avalanche eERC.
+- A larger decentralized verifier set / staked jurors, ERC-4626 bond vault, the fee-to-verifier
+  split, richer correctness policies for subjective tasks, confidential settlement via Avalanche
+  eERC, and a third-party audit before mainnet value.
 
 ## Repository
 

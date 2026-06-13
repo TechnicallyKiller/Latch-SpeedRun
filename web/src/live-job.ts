@@ -6,6 +6,7 @@ export interface LiveStep {
   tx?: `0x${string}`;
   note?: string;
   engine?: string;
+  balances?: { buyer: string; provider: string };
 }
 
 export function emptyLive(label: string, amount = 5000n, bond = 1000n): Job {
