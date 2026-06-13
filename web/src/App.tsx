@@ -5,6 +5,7 @@ import { Post } from "./pages/Post";
 import { Docs } from "./pages/Docs";
 import { Sdk } from "./pages/Sdk";
 import { Security } from "./pages/Security";
+import { Marketplace } from "./pages/Marketplace";
 import { SiteFooter } from "./components/SiteFooter";
 
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
@@ -320,6 +321,7 @@ export default function App() {
         <Route path="/docs" element={<Docs />} />
         <Route path="/sdk" element={<Sdk />} />
         <Route path="/security" element={<Security />} />
+        <Route path="/marketplace" element={<Marketplace />} />
         <Route path="/business" element={<Business />} />
       </Routes>
     </BrowserRouter>

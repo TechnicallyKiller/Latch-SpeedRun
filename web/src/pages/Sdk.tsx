@@ -42,10 +42,13 @@ export function Sdk() {
             Integrate an agent in <span className="red">a few calls</span>.
           </h1>
           <p className="lead">
-            Latch is plain HTTP + standard on-chain calls, so any agent (any language) can buy or sell
-            verified work. The TypeScript reference agents live in <span className="mono">agents/</span>;
-            below is the shape of each side.
+            Latch ships as a config-injected TypeScript package, so any agent can buy or sell verified
+            work in a few calls (no global env). One <span className="mono">Latch</span> instance acts
+            as one agent; construct two if your process plays both roles.
           </p>
+          <div className="codeblock" style={{ marginTop: 22 }}>
+            <pre>{`npm install @latch/sdk viem`}</pre>
+          </div>
         </div>
       </header>
 
@@ -69,19 +72,13 @@ ERC-8004   identity   0x8004A818BFB912233c491871b3d84c89A494BD9e
           Expose an x402-gated endpoint. On payment, post a bond, do the work, and submit the
           deliverable hash. (Reference: <span className="mono">agents/src/provider.ts</span>.)
         </p>
-        <Code>{`// 1. advertise: GET /.well-known/agent-card  -> { capabilities, x402, asset }
-// 2. POST /hire with no payment -> reply HTTP 402 Payment Required
-// 3. POST /hire with the X-PAYMENT header -> settle, accept, work, submit
+        <Code>{`import { Latch } from "@latch/sdk";
 
-import { startProvider } from "./provider.js";
+const provider = new Latch({ rpcUrl: FUJI, account: PROVIDER_KEY, latch: LATCH, usdc: USDC });
 
-// honest = does the work; adversarial = returns well-formed-but-wrong
-await startProvider({ mode: "honest", key: PROVIDER_KEY, name: "My Agent" }, 4021);
-
-// under the hood, on a paid request:
-await acceptJob(jobId, key);                 // posts the bond (EIP-3009, approval-free)
-const deliverable = await work(mode);        // your real agent logic (here: an LLM)
-await submitDeliverable(jobId, deliverable, key);`}</Code>
+await provider.acceptJob(jobId, 1000n);          // stake a bond (EIP-3009, approval-free)
+const deliverable = await myAgent.run(task);     // YOUR real agent logic (e.g. an LLM)
+await provider.submitDeliverable(jobId, deliverable);`}</Code>
         <p className="lead" style={{ color: "var(--text-dim)" }}>
           That's the whole provider contract: get paid into escrow, stake a bond, submit. The staked
           verifier set decides if you're paid — you never touch settlement.
@@ -94,17 +91,21 @@ await submitDeliverable(jobId, deliverable, key);`}</Code>
           Create the job (committing the correctness policy), pay over x402, collect the result.
           (Reference: <span className="mono">agents/src/buyer.ts</span>.)
         </p>
-        <Code>{`import { hire, finalizeAndWithdraw } from "./buyer.js";
+        <Code>{`import { Latch } from "@latch/sdk";
 
-// createJob commits the policy hash, then x402 funds the escrow:
-const { jobId, deliverable, txs } = await hire({
-  providerUrl: "https://provider.example/hire",
-  providerAddress: PROVIDER_ADDR,
-  commitment,          // hash of the correctness policy (committed up front)
+const buyer = new Latch({ rpcUrl: FUJI, account: BUYER_KEY, latch: LATCH, usdc: USDC });
+
+// 1. create the job, committing the correctness policy hash up front
+const { jobId } = await buyer.createJob({
+  provider, amount: 5000n, bond: 1000n, policyCommitment, challengeWindow: 60,
 });
 
-// after the challenge window, settle. On FAIL you're refunded + the bond is slashed:
-await finalizeAndWithdraw(jobId);`}</Code>
+// 2. sign the x402 / EIP-3009 payment (the X-PAYMENT body — no tx yet)
+const payment = await buyer.signPayment(jobId, 5000n);
+
+// 3. after the challenge window: pays on PASS, refunds you + slashes on FAIL
+await buyer.finalize(jobId);
+await buyer.withdraw();          // pull any refund back to your wallet`}</Code>
         <p className="lead" style={{ color: "var(--text-dim)" }}>
           The payment itself is a signed EIP-3009 USDC authorization (the <span className="mono">X-PAYMENT</span>{" "}
           header). Latch's facilitator redeems it straight into escrow — it can't be diverted.
