@@ -11,6 +11,38 @@ function emptyLive(mode: string): Job {
   return makeLive(`Live run · ${mode === "fail" ? "scammer" : "honest"}`);
 }
 
+function WalletCard({
+  role,
+  desc,
+  amount,
+  delta,
+  accent,
+}: {
+  role: string;
+  desc: string;
+  amount: string;
+  delta?: bigint;
+  accent: "buy" | "prov";
+}) {
+  const moved = delta !== undefined && delta !== 0n;
+  const abs = moved ? (Number(delta > 0n ? delta : -delta) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 6 }) : "";
+  return (
+    <div className={`wallet-card flash ${accent}`}>
+      <div className="wallet-top">
+        <span className="wallet-role">{role}</span>
+        {moved && (
+          <span className={`wallet-delta ${delta! > 0n ? "up" : "down"}`}>
+            {delta! > 0n ? "+" : "−"}
+            {abs}
+          </span>
+        )}
+      </div>
+      <span className="wallet-amt mono">{usdc(BigInt(amount))}</span>
+      <span className="wallet-desc">{desc}</span>
+    </div>
+  );
+}
+
 export function Explorer() {
   const [live, setLive] = useState<Job | null>(null);
   const [running, setRunning] = useState<string | null>(null); // currently-running node key
@@ -24,6 +56,8 @@ export function Explorer() {
   const [task, setTask] = useState<Record<string, string> | null>(null);
   const [windowSec, setWindowSec] = useState(30);
   const [balances, setBalances] = useState<{ buyer: string; provider: string } | null>(null);
+  const [delta, setDelta] = useState<{ buyer: bigint; provider: bigint } | null>(null);
+  const lastBalRef = useRef<{ buyer: string; provider: string } | null>(null);
   const [flash, setFlash] = useState(0); // bumps on each balance update to retrigger the flash anim
   const [countdown, setCountdown] = useState<number | null>(null);
 
@@ -65,6 +99,8 @@ export function Explorer() {
     setErrMsg(null);
     setRunning(null);
     setBalances(null);
+    setDelta(null);
+    lastBalRef.current = null;
 
     const es = new EventSource(`${SERVER}/api/run?mode=${mode}`);
     esRef.current = es;
@@ -73,6 +109,14 @@ export function Explorer() {
     es.addEventListener("step", (e) => {
       const s = JSON.parse((e as MessageEvent).data) as LiveStep;
       if (s.balances) {
+        const prev = lastBalRef.current;
+        if (prev) {
+          setDelta({
+            buyer: BigInt(s.balances.buyer) - BigInt(prev.buyer),
+            provider: BigInt(s.balances.provider) - BigInt(prev.provider),
+          });
+        }
+        lastBalRef.current = s.balances;
         setBalances(s.balances);
         setFlash((f) => f + 1);
       }
@@ -173,23 +217,37 @@ export function Explorer() {
       </div>
 
       {(balances || countdown !== null) && (
-        <div className="live-meter">
+        <div className="wallet-meter">
           {balances && (
             <>
-              <div key={`b${flash}`} className="meter-cell flash">
-                <span className="meter-k mono">buyer wallet</span>
-                <span className="meter-v mono">{usdc(BigInt(balances.buyer))}</span>
+              <WalletCard
+                key={`b${flash}`}
+                role="Buyer wallet"
+                desc="the agent that pays for the work"
+                amount={balances.buyer}
+                delta={delta?.buyer}
+                accent="buy"
+              />
+              <div className="wallet-flow">
+                <span className="wallet-flow-line" />
+                <span className="mono">escrow</span>
+                <span className="wallet-flow-line" />
               </div>
-              <div key={`p${flash}`} className="meter-cell flash">
-                <span className="meter-k mono">provider wallet</span>
-                <span className="meter-v mono">{usdc(BigInt(balances.provider))}</span>
-              </div>
+              <WalletCard
+                key={`p${flash}`}
+                role="Provider wallet"
+                desc="the agent that does the work + stakes a bond"
+                amount={balances.provider}
+                delta={delta?.provider}
+                accent="prov"
+              />
             </>
           )}
           {countdown !== null && (
-            <div className="meter-cell live-countdown">
-              <span className="meter-k mono">challenge window</span>
-              <span className="meter-v mono">{countdown}s</span>
+            <div className="wallet-card countdown">
+              <span className="wallet-role">Challenge window</span>
+              <span className="wallet-amt mono red">{countdown}s</span>
+              <span className="wallet-desc">time left to dispute before settle</span>
             </div>
           )}
         </div>
