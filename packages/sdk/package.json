@@ -1,6 +1,6 @@
 {
   "name": "@latch-0xdivyanshh/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Plug-and-play client for Latch — verifiable settlement for agent commerce on Avalanche. Buy or sell verified work in a few calls.",
   "type": "module",
   "main": "dist/index.js",
