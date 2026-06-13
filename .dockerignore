@@ -1,0 +1,9 @@
+# keep the build context small + never ship local deps/artifacts/secrets
+**/node_modules
+**/target
+**/dist
+**/.env
+.git
+contracts
+web
+docs

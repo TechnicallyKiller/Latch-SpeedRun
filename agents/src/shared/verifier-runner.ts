@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 const VERIFIER_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../../verifier");
 
 function run(args: string[]): string {
+  // In a deployed container we ship a prebuilt binary (no Rust toolchain at runtime); locally we
+  // fall back to `cargo run` so dev needs no extra build step.
+  const bin = process.env.AGENT_VERIFY_BIN;
+  if (bin) return execFileSync(bin, args, { cwd: VERIFIER_DIR, encoding: "utf8" });
   return execFileSync("cargo", ["run", "--quiet", "--bin", "agent_verify", "--", ...args], {
     cwd: VERIFIER_DIR,
     encoding: "utf8",
