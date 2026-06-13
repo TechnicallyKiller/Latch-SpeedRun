@@ -13,6 +13,62 @@ const WINDOW = 30; // shorter challenge window for a snappier live demo (contrac
 
 let running = false;
 
+// Buffer the in-progress run so a client that navigates away (or reloads) can reattach and resume,
+// instead of seeing a blank page while the backend keeps working.
+type RunPhase = "running" | "done" | "error";
+interface CurrentRun {
+  mode: string;
+  steps: unknown[];
+  phase: RunPhase;
+  result?: unknown;
+  error?: string;
+}
+let current: CurrentRun | null = null;
+const subscribers = new Set<import("express").Response>();
+
+function broadcast(event: string, data: unknown) {
+  const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const r of subscribers) {
+    try {
+      r.write(frame);
+    } catch {
+      /* dropped subscriber */
+    }
+  }
+}
+
+/** Run a job while tracking it for reattachment: stream to the initiator + any attached clients. */
+async function trackedRun(
+  res: import("express").Response,
+  mode: string,
+  send: (event: string, data: unknown) => void,
+  runner: (emit: (s: unknown) => void) => Promise<unknown>,
+) {
+  current = { mode, steps: [], phase: "running" };
+  running = true;
+  send("start", { mode });
+  broadcast("start", { mode });
+  try {
+    const result = await runner((s) => {
+      current!.steps.push(s);
+      send("step", s);
+      broadcast("step", s);
+    });
+    current.phase = "done";
+    current.result = result;
+    send("done", result);
+    broadcast("done", result);
+  } catch (e) {
+    current.phase = "error";
+    current.error = String(e);
+    send("error", { error: String(e) });
+    broadcast("error", { error: String(e) });
+  } finally {
+    running = false;
+    res.end();
+  }
+}
+
 async function main() {
   // Boot the two provider gateways once. Both use the funded PROVIDER key (the live one-click run
   // is a single job, not the reputation comparison) — only the mode/answers differ. A FAIL slashes
@@ -82,17 +138,9 @@ async function main() {
       send("error", { error: "a job is already running — try again in a moment" });
       return res.end();
     }
-    running = true;
-    try {
-      send("start", { mode: req.body.mode });
-      const result = await runJudgeJob({ ...req.body, window: WINDOW }, (s) => send("step", s));
-      send("done", result);
-    } catch (e) {
-      send("error", { error: String(e) });
-    } finally {
-      running = false;
-      res.end();
-    }
+    await trackedRun(res, req.body.mode, send, (emit) =>
+      runJudgeJob({ ...req.body, window: WINDOW }, emit as (s: unknown) => void),
+    );
   });
 
   // One real agent job on Fuji, streamed step-by-step over SSE.
@@ -112,24 +160,33 @@ async function main() {
       res.end();
       return;
     }
-    running = true;
-    try {
-      const provider =
-        mode === "fail"
-          ? { url: "http://localhost:4022", addr: addrOf(keys.provider) }
-          : { url: "http://localhost:4021", addr: addrOf(keys.provider) };
-      send("start", { mode });
-      const result = await runLiveJob(
+    const provider =
+      mode === "fail"
+        ? { url: "http://localhost:4022", addr: addrOf(keys.provider) }
+        : { url: "http://localhost:4021", addr: addrOf(keys.provider) };
+    await trackedRun(res, mode, send, (emit) =>
+      runLiveJob(
         { providerUrl: provider.url, providerAddress: provider.addr, commitment, window: WINDOW },
-        (s) => send("step", s),
-      );
-      send("done", result);
-    } catch (e) {
-      send("error", { error: String(e) });
-    } finally {
-      running = false;
-      res.end();
+        emit as (s: unknown) => void,
+      ),
+    );
+  });
+
+  // Reattach to the in-progress run (or replay the last one): replays buffered steps, then streams
+  // live if still running. Lets a client that navigated away or reloaded resume the view.
+  app.get("/api/run/attach", (_req, res) => {
+    res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    (res as any).flushHeaders?.();
+    const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    // Only resume an in-progress run; a finished one shouldn't pop up for a fresh visitor.
+    if (!current || current.phase !== "running") {
+      send("idle", {});
+      return res.end();
     }
+    send("start", { mode: current.mode });
+    for (const s of current.steps) send("step", s);
+    subscribers.add(res);
+    _req.on("close", () => subscribers.delete(res));
   });
 
   app.listen(PORT, () => console.log(`Latch live-run server on http://localhost:${PORT}`));

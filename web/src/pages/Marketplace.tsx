@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Job } from "../chain";
 import { buildSteps } from "../lifecycle";
 import { Workflow } from "../components/Workflow";
@@ -54,19 +54,12 @@ export function Marketplace() {
   const steps = useMemo(() => (job ? buildSteps(job) : []), [job]);
   const step = steps.find((s) => s.key === selKey) ?? steps[0];
 
-  function hire(p: Provider) {
-    if (phase === "running") return;
-    esRef.current?.close();
-    setHired(p);
-    setJob(emptyLive(`Hired ${p.name}`));
-    setRunning(null);
-    setSelKey("create");
-    setPhase("running");
-    setErrMsg(null);
-
-    const es = new EventSource(`${SERVER}/api/run?mode=${p.mode}`);
-    esRef.current = es;
+  function bindStream(es: EventSource, opts?: { onStart?: (mode: "honest" | "fail") => void }) {
     let finished = false;
+    es.addEventListener("start", (e) => {
+      const mode = JSON.parse((e as MessageEvent).data).mode === "fail" ? "fail" : "honest";
+      opts?.onStart?.(mode);
+    });
     es.addEventListener("step", (e) => {
       const s = JSON.parse((e as MessageEvent).data) as LiveStep;
       if (s.status === "running") setRunning(s.key);
@@ -81,6 +74,7 @@ export function Marketplace() {
       setPhase("done");
       es.close();
     });
+    es.addEventListener("idle", () => es.close());
     es.addEventListener("error", (e) => {
       const data = (e as MessageEvent).data;
       if (data) {
@@ -94,6 +88,38 @@ export function Marketplace() {
         es.close();
       }
     });
+  }
+
+  // Reattach to a run still in progress if the user navigated away and came back.
+  useEffect(() => {
+    const es = new EventSource(`${SERVER}/api/run/attach`);
+    bindStream(es, {
+      onStart: (mode) => {
+        const p = PROVIDERS.find((x) => x.mode === mode) ?? null;
+        setHired(p);
+        setJob(emptyLive(p ? `Hired ${p.name}` : "Live job"));
+        setRunning(null);
+        setSelKey("create");
+        setPhase("running");
+      },
+    });
+    return () => es.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function hire(p: Provider) {
+    if (phase === "running") return;
+    esRef.current?.close();
+    setHired(p);
+    setJob(emptyLive(`Hired ${p.name}`));
+    setRunning(null);
+    setSelKey("create");
+    setPhase("running");
+    setErrMsg(null);
+
+    const es = new EventSource(`${SERVER}/api/run?mode=${p.mode}`);
+    esRef.current = es;
+    bindStream(es);
   }
 
   const passed = job?.settled?.pass;

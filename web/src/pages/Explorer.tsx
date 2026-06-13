@@ -89,6 +89,73 @@ export function Explorer() {
   const step = steps.find((s) => s.key === selKey) ?? steps[0];
   const isLiveSelected = live !== null && idx === 0;
 
+  function handleStep(s: LiveStep) {
+    if (s.balances) {
+      const prev = lastBalRef.current;
+      if (prev) {
+        setDelta({
+          buyer: BigInt(s.balances.buyer) - BigInt(prev.buyer),
+          provider: BigInt(s.balances.provider) - BigInt(prev.provider),
+        });
+      }
+      lastBalRef.current = s.balances;
+      setBalances(s.balances);
+      setFlash((f) => f + 1);
+    }
+    if (s.status === "running") setRunning(s.key);
+    else {
+      setRunning((r) => (r === s.key ? null : r));
+      setLive((prev) => (prev ? applyStep(prev, s) : prev));
+    }
+  }
+
+  function bindStream(es: EventSource, opts?: { onStart?: (mode: string) => void }) {
+    let finished = false;
+    es.addEventListener("start", (e) => {
+      const mode = JSON.parse((e as MessageEvent).data).mode === "fail" ? "fail" : "honest";
+      opts?.onStart?.(mode);
+    });
+    es.addEventListener("step", (e) => handleStep(JSON.parse((e as MessageEvent).data) as LiveStep));
+    es.addEventListener("done", () => {
+      finished = true;
+      setRunning(null);
+      setPhase("done");
+      es.close();
+    });
+    es.addEventListener("idle", () => es.close()); // attach: nothing running
+    es.addEventListener("error", (e) => {
+      const data = (e as MessageEvent).data;
+      if (data) {
+        setErrMsg(JSON.parse(data).error ?? "run failed");
+        setPhase("error");
+        finished = true;
+        es.close();
+      } else if (!finished) {
+        setErrMsg("lost connection to the engine (is it running on :4030?)");
+        setPhase("error");
+        es.close();
+      }
+    });
+  }
+
+  // On mount, reattach to any run still in progress (e.g. after navigating away mid-run).
+  useEffect(() => {
+    const es = new EventSource(`${SERVER}/api/run/attach`);
+    bindStream(es, {
+      onStart: (mode) => {
+        setLive((prev) => prev ?? emptyLive(mode));
+        setIdx(0);
+        setPhase("running");
+        setRunning(null);
+        lastBalRef.current = null;
+        setBalances(null);
+        setDelta(null);
+      },
+    });
+    return () => es.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function run(mode: "honest" | "fail") {
     if (phase === "running") return;
     esRef.current?.close();
@@ -104,47 +171,7 @@ export function Explorer() {
 
     const es = new EventSource(`${SERVER}/api/run?mode=${mode}`);
     esRef.current = es;
-    let finished = false;
-
-    es.addEventListener("step", (e) => {
-      const s = JSON.parse((e as MessageEvent).data) as LiveStep;
-      if (s.balances) {
-        const prev = lastBalRef.current;
-        if (prev) {
-          setDelta({
-            buyer: BigInt(s.balances.buyer) - BigInt(prev.buyer),
-            provider: BigInt(s.balances.provider) - BigInt(prev.provider),
-          });
-        }
-        lastBalRef.current = s.balances;
-        setBalances(s.balances);
-        setFlash((f) => f + 1);
-      }
-      if (s.status === "running") setRunning(s.key);
-      else {
-        setRunning((r) => (r === s.key ? null : r));
-        setLive((prev) => (prev ? applyStep(prev, s) : prev));
-      }
-    });
-    es.addEventListener("done", () => {
-      finished = true;
-      setRunning(null);
-      setPhase("done");
-      es.close();
-    });
-    es.addEventListener("error", (e) => {
-      const data = (e as MessageEvent).data;
-      if (data) {
-        setErrMsg(JSON.parse(data).error ?? "run failed");
-        setPhase("error");
-        finished = true;
-        es.close();
-      } else if (!finished) {
-        setErrMsg("lost connection to the live-run server (is it running on :4030?)");
-        setPhase("error");
-        es.close();
-      }
-    });
+    bindStream(es);
   }
 
   return (
