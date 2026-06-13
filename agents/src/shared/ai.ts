@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export type Mode = "honest" | "adversarial";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 /**
  * The job: classify three clues into the single common animal each describes. The verifier's
@@ -52,10 +53,6 @@ function parseAnswer(text: string): Record<string, string> | null {
  * confidently wrong. Without a key, falls back to the deterministic answers so demos still work.
  */
 export async function work(mode: Mode): Promise<{ deliverable: Record<string, string>; ai: boolean }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { deliverable: CANNED[mode], ai: false };
-
-  const client = new Anthropic({ apiKey });
   const system = mode === "honest" ? HONEST_SYSTEM : SCAMMER_SYSTEM;
   const content =
     mode === "honest"
@@ -63,16 +60,45 @@ export async function work(mode: Mode): Promise<{ deliverable: Record<string, st
       : "Return your three answers now."; // scammer never sees the clues
 
   try {
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 200,
-      system,
-      messages: [{ role: "user", content }],
-    });
-    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    let text: string | null = null;
+    if (process.env.GROQ_API_KEY) text = await askGroq(system, content); // free, no credit card
+    else if (process.env.ANTHROPIC_API_KEY) text = await askClaude(system, content);
+
+    if (text === null) return { deliverable: CANNED[mode], ai: false }; // no key set
     const parsed = parseAnswer(text);
     return { deliverable: parsed ?? CANNED[mode], ai: parsed !== null };
   } catch {
     return { deliverable: CANNED[mode], ai: false }; // never let a flaky API break the demo
   }
+}
+
+async function askClaude(system: string, content: string): Promise<string> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  const msg = await client.messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: 200,
+    system,
+    messages: [{ role: "user", content }],
+  });
+  return msg.content[0]?.type === "text" ? msg.content[0].text : "";
+}
+
+/** Groq is OpenAI-API-compatible and has a free, no-card tier — used via plain fetch (no new dep). */
+async function askGroq(system: string, content: string): Promise<string> {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      max_tokens: 200,
+      temperature: 0.4,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`groq ${res.status}`);
+  const json = (await res.json()) as { choices: { message: { content: string } }[] };
+  return json.choices[0]?.message?.content ?? "";
 }
