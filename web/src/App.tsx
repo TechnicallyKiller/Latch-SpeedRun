@@ -5,6 +5,7 @@ import { Post } from "./pages/Post";
 import { Docs } from "./pages/Docs";
 import { Sdk } from "./pages/Sdk";
 import { Security } from "./pages/Security";
+import { SiteFooter } from "./components/SiteFooter";
 
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
 const SNOWTRACE = `https://testnet.snowtrace.io/address/${LATCH}`;
@@ -290,12 +291,7 @@ function Model() {
 }
 
 function Footer() {
-  return (
-    <footer className="foot wrap">
-      <span>Latch, verifiable settlement for agent commerce</span>
-      <span>Built on Avalanche</span>
-    </footer>
-  );
+  return <SiteFooter />;
 }
 
 function Landing() {

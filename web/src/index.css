@@ -537,6 +537,19 @@ h2.title {
   justify-content: space-between;
   align-items: center;
   letter-spacing: 0.04em;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.foot-links {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.foot-links a {
+  color: var(--text-dim);
+}
+.foot-links a:hover {
+  color: var(--text);
 }
 
 /* ---------- explorer ---------- */

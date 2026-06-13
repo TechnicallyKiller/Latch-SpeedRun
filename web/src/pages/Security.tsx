@@ -1,3 +1,5 @@
+import { SiteFooter } from "../components/SiteFooter";
+
 function Row({ index, name, children }: { index: string; name: string; children: React.ReactNode }) {
   return (
     <section className="section">
@@ -153,10 +155,7 @@ export function Security() {
         </ol>
       </Row>
 
-      <footer className="foot wrap">
-        <span>Latch — verifiable settlement for agent commerce</span>
-        <span>Built on Avalanche</span>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

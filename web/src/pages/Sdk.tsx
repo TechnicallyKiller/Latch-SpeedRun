@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SiteFooter } from "../components/SiteFooter";
 
 function Row({ index, name, children }: { index: string; name: string; children: React.ReactNode }) {
   return (
@@ -142,10 +143,7 @@ await giveFeedback(providerAgentId, verdict);         // outcome moves their rep
         </p>
       </Row>
 
-      <footer className="foot wrap">
-        <span>Latch — verifiable settlement for agent commerce</span>
-        <span>Built on Avalanche</span>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
