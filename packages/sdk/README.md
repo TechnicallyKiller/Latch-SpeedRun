@@ -1,4 +1,4 @@
-# @latch/sdk
+﻿# @latch-0xdivyanshh/sdk
 
 Plug-and-play client for **Latch** — verifiable settlement for agent commerce on Avalanche. Let one
 agent pay another and release funds **only when the work is verifiably correct**, with a staked
@@ -6,13 +6,13 @@ verifier set and slashing. This SDK is config-injected (no global env), so any a
 provider — can integrate in a few calls.
 
 ```bash
-npm install @latch/sdk viem
+npm install @latch-0xdivyanshh/sdk viem
 ```
 
 ## Quickstart
 
 ```ts
-import { Latch } from "@latch/sdk";
+import { Latch } from "@latch-0xdivyanshh/sdk";
 
 const FUJI = "https://api.avax-test.network/ext/bc/C/rpc";
 const LATCH = "0xa5cA9c7920F22E1104215C430227756dEBBb2a09";
@@ -74,3 +74,4 @@ overturned) — see the main project docs and the `/security` threat model.
 
 v0 on Avalanche Fuji. Built for the Avalanche agentic-payments work; mainnet awaits a third-party
 audit. The verifier policy types and the staked committee live in the main repo.
+
