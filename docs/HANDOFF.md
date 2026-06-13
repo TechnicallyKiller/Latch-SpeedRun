@@ -39,20 +39,34 @@ of every transaction we make safe, and we run the staked network that decides wh
 | **Judge-as-buyer wallet flow** (connect → sign → withdraw) | done | `/post` + `agents/src/judge.ts` + `/api/judge-run`; judge funds with own USDC, refund to own wallet |
 | **Real AI provider agents** (honest vs confidently-wrong) | done | `agents/src/shared/ai.ts` `work()`; Groq Llama 3.3 (free) or Claude Haiku, deterministic fallback |
 
-**~90% toward a polished, judge-ready submission.** The hard/novel work + the two interactive flows
-are done; what's left is hosting + recording, not new protocol.
+**FEATURE-COMPLETE + DEPLOYED LIVE.** Both interactive flows, the real AI agents, the full page set,
+and the deployment are done and verified end-to-end on Fuji. What remains is non-build: recording +
+the `main` merge.
 
-### What's NOT done (next)
-1. **Host the live-run backend publicly (the one remaining build).** Both interactive flows work
-   locally but the frontend hits `SERVER` = `import.meta.env.VITE_LIVE_RUN_URL ?? "http://localhost:4030"`
-   (`web/src/pages/Explorer.tsx`, imported by `/post`). For the deployed site, run `agents/src/server.ts`
-   on a public host (Railway / Render / Fly / a small VM) with the funded demo `.env` (incl. GROQ_API_KEY),
-   and set `VITE_LIVE_RUN_URL` in the site build env. CORS is already `*`.
-2. **Smoke-test the full `/post` flow against Fuji in a browser** (connect wallet → scammer → withdraw
-   refund). Verified locally up to typecheck/build + a curl `/api/run`, but the 3-wallet-pop path needs
-   a real injected wallet. Demo accounts must hold a little AVAX + USDC (the `/api/faucet` drips from
-   DEPLOYER/BUYER).
-3. Agent SDK page (optional); recording; merge `staked-committee` -> `main`; docs/threat-model pass.
+### Status: shipped
+- **Deployed (free, no credit card):** frontend on **Netlify** (`netlify.toml`, SPA redirects), agent
+  server on **Render** via the multi-stage `Dockerfile` (Rust verifier + Node) using `render.yaml`.
+  Frontend reads the engine URL from `VITE_LIVE_RUN_URL`. `SERVER` =
+  `import.meta.env.VITE_LIVE_RUN_URL ?? "http://localhost:4030"` (`web/src/pages/Explorer.tsx`).
+- **Verified end-to-end in a browser:** the `/post` 3-wallet-pop flow (create → sign payment →
+  withdraw refund) and the `/explorer` one-click run both settle on Fuji with the real Groq agent.
+- **Full page set, in nav + a shared footer:** Landing · Docs · SDK · Security · Business · Live Demo
+  · Post a job (`web/src/components/SiteFooter.tsx`; nav hides the Fuji pill < 1100px to avoid overflow).
+
+### What's NOT done (non-build)
+1. **Record the demo** — the `/post` "connect → scammer → refund to your wallet" flow is the headline.
+2. **Submit** (live site + repo link).
+3. **Merge `staked-committee` → `main`** (user controls merges).
+
+### Deploy gotchas already solved (don't re-discover)
+- `agents/src/server.ts` reads `process.env.PORT`; `tsx` moved to dependencies (prod install runs it).
+- Slim Node image omits root certs → the Rust verifier's HTTPS calls panic; `Dockerfile` installs
+  `ca-certificates`. Verifier-runner uses `AGENT_VERIFY_BIN` (prebuilt binary) in the container, `cargo
+  run` locally.
+- Wallet receipts confirmed via a dedicated Fuji RPC (`api.avax-test.network`) with a 180s timeout —
+  the injected wallet RPC was too slow and timed out create/withdraw (`web/src/wallet.ts`).
+- `finalizeWithRetry` (`agents/src/buyer.ts`) waits out `ChallengeWindowOpen()` (0xfa7bc547).
+- Render free sleeps after 15 min idle → add a free UptimeRobot ping to `/api/health` for demos.
 
 ---
 
