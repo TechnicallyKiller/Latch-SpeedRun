@@ -1,0 +1,27 @@
+{
+  "name": "@latch/sdk",
+  "version": "0.1.0",
+  "description": "Plug-and-play client for Latch — verifiable settlement for agent commerce on Avalanche. Buy or sell verified work in a few calls.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["avalanche", "x402", "erc-8004", "agents", "escrow", "ai-agents"],
+  "license": "MIT",
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
