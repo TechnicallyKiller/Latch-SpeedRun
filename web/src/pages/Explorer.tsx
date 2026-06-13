@@ -74,7 +74,7 @@ export function Explorer() {
     <div className="explorer wrap">
       <header className="exp-head">
         <div>
-          <span className="eyebrow">Live explorer</span>
+          <span className="eyebrow">Live demo</span>
           <h1 className="exp-title">Watch a real job settle, step by step.</h1>
           <p className="lead">
             Press a button below and Latch runs a <b>real job on Fuji</b> — no wallet needed. Each

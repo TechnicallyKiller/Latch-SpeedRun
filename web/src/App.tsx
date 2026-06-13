@@ -16,7 +16,7 @@ function Nav() {
         </Link>
         <div className="nav-links">
           <a href="/#loop">How it works</a>
-          <Link to="/explorer">Explorer</Link>
+          <Link to="/explorer">Live Demo</Link>
           <Link to="/business">Business</Link>
           <a className="pill" href={SNOWTRACE} target="_blank" rel="noreferrer">
             <span className="live" />
