@@ -178,9 +178,21 @@ h2.title {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 18px;
   font-size: 14px;
   color: var(--text-dim);
+}
+/* free up room for the extra links on smaller screens */
+@media (max-width: 1100px) {
+  .nav .pill {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .nav-links {
+    gap: 14px;
+    font-size: 13px;
+  }
 }
 .nav-links a,
 .brand {
