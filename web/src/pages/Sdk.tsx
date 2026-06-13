@@ -47,7 +47,7 @@ export function Sdk() {
             as one agent; construct two if your process plays both roles.
           </p>
           <div className="codeblock" style={{ marginTop: 22 }}>
-            <pre>{`npm install @latch/sdk viem`}</pre>
+            <pre>{`npm install @latch-0xdivyanshh/sdk viem`}</pre>
           </div>
         </div>
       </header>
@@ -72,7 +72,7 @@ ERC-8004   identity   0x8004A818BFB912233c491871b3d84c89A494BD9e
           Expose an x402-gated endpoint. On payment, post a bond, do the work, and submit the
           deliverable hash. (Reference: <span className="mono">agents/src/provider.ts</span>.)
         </p>
-        <Code>{`import { Latch } from "@latch/sdk";
+        <Code>{`import { Latch } from "@latch-0xdivyanshh/sdk";
 
 const provider = new Latch({ rpcUrl: FUJI, account: PROVIDER_KEY, latch: LATCH, usdc: USDC });
 
@@ -91,7 +91,7 @@ await provider.submitDeliverable(jobId, deliverable);`}</Code>
           Create the job (committing the correctness policy), pay over x402, collect the result.
           (Reference: <span className="mono">agents/src/buyer.ts</span>.)
         </p>
-        <Code>{`import { Latch } from "@latch/sdk";
+        <Code>{`import { Latch } from "@latch-0xdivyanshh/sdk";
 
 const buyer = new Latch({ rpcUrl: FUJI, account: BUYER_KEY, latch: LATCH, usdc: USDC });
 
