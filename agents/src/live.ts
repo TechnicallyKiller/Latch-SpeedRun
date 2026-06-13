@@ -27,6 +27,7 @@ export interface LiveStep {
   status: "running" | "done" | "pass" | "fail";
   tx?: string;
   note?: string;
+  engine?: string; // which LLM produced the deliverable (surfaced on the submit node)
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -42,7 +43,7 @@ export async function runLiveJob(
   emit({ key: "create", status: "done", tx: r.createTx });
   emit({ key: "fund", status: "done", tx: r.txs.fund });
   emit({ key: "accept", status: "done", tx: r.txs.accept });
-  emit({ key: "submit", status: "done", tx: r.txs.submit, note: JSON.stringify(r.deliverable) });
+  emit({ key: "submit", status: "done", tx: r.txs.submit, note: JSON.stringify(r.deliverable), engine: r.engine });
 
   emit({ key: "verify", status: "running" });
   const v = verifyDeliverable(r.jobId, r.deliverable);

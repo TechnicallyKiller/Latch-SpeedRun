@@ -7,6 +7,7 @@ import { buildPayment, encodePayment, type PaymentRequiredBody } from "./shared/
 export interface HireResult {
   jobId: bigint;
   deliverable: Record<string, string>;
+  engine?: string;
   createTx: `0x${string}`;
   txs: { fund: `0x${string}`; accept: `0x${string}`; submit: `0x${string}` };
 }
@@ -70,9 +71,9 @@ export async function hire(opts: {
     body: JSON.stringify({ jobId: jobId.toString(), buyer: buyerAddr }),
   });
   if (!paid.ok) throw new Error(`hire failed: ${paid.status} ${await paid.text()}`);
-  const body = (await paid.json()) as { deliverable: Record<string, string>; txs: HireResult["txs"] };
+  const body = (await paid.json()) as { deliverable: Record<string, string>; engine?: string; txs: HireResult["txs"] };
 
-  return { jobId, deliverable: body.deliverable, createTx, txs: body.txs };
+  return { jobId, deliverable: body.deliverable, engine: body.engine, createTx, txs: body.txs };
 }
 
 /** After settlement, the buyer finalizes (anyone may) and withdraws any refund owed. */

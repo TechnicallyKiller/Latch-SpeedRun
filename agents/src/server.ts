@@ -6,6 +6,7 @@ import { LATCH, USDC, addrOf, amounts, keys, publicClient, walletFor } from "./s
 import { policyCommitment } from "./shared/verifier-runner.js";
 import { runLiveJob } from "./live.js";
 import { runJudgeJob } from "./judge.js";
+import { engineName, TASK } from "./shared/ai.js";
 
 const PORT = 4030;
 const WINDOW = 30; // shorter challenge window for a snappier live demo (contract minimum)
@@ -43,6 +44,8 @@ async function main() {
       amount: amounts.job.toString(),
       bond: amounts.bond.toString(),
       window: WINDOW,
+      engine: engineName(),
+      task: TASK,
     });
   });
 

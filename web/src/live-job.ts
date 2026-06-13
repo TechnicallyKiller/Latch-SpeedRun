@@ -5,6 +5,7 @@ export interface LiveStep {
   status: "running" | "done" | "pass" | "fail";
   tx?: `0x${string}`;
   note?: string;
+  engine?: string;
 }
 
 export function emptyLive(label: string, amount = 5000n, bond = 1000n): Job {
@@ -18,7 +19,17 @@ export function applyStep(job: Job, s: LiveStep): Job {
   if (s.key === "create" && tx) j.created = { tx };
   else if (s.key === "fund" && tx) j.funded = { tx };
   else if (s.key === "accept" && tx) j.accepted = { tx };
-  else if (s.key === "submit" && tx) j.submitted = { tx };
+  else if (s.key === "submit" && tx) {
+    j.submitted = { tx };
+    if (s.engine) j.engine = s.engine;
+    if (s.note) {
+      try {
+        j.deliverable = JSON.parse(s.note);
+      } catch {
+        /* note isn't JSON */
+      }
+    }
+  }
   else if (s.key === "verify" && (s.status === "pass" || s.status === "fail")) {
     const score = BigInt(s.note?.match(/score (\d+)/)?.[1] ?? "0");
     j.verdict = { tx: j.verdict?.tx ?? ("0x" as `0x${string}`), pass: s.status === "pass", score, evidenceURI: "ipfs://(pinned)", signers: 1n };

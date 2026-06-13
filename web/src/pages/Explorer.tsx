@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { JOBS, LATCH, snowtraceAddr, usdc, type Job } from "../chain";
 import { buildSteps } from "../lifecycle";
 import { Workflow } from "../components/Workflow";
@@ -20,6 +20,14 @@ export function Explorer() {
 
   const [idx, setIdx] = useState(0);
   const [selKey, setSelKey] = useState("create");
+  const [engine, setEngine] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${SERVER}/api/config`)
+      .then((r) => r.json())
+      .then((c) => setEngine(c.engine))
+      .catch(() => setEngine(null));
+  }, []);
 
   const jobs = useMemo(() => (live ? [live, ...JOBS] : JOBS), [live]);
   const job = jobs[Math.min(idx, jobs.length - 1)];
@@ -98,6 +106,11 @@ export function Explorer() {
         {phase === "running" && <span className="run-status mono">running on Fuji…</span>}
         {phase === "done" && <span className="run-status mono ok">settled ✓</span>}
         {phase === "error" && <span className="run-status mono err">{errMsg}</span>}
+        {engine && (
+          <span className="engine-badge mono" title="The provider agents are real LLM calls">
+            <span className="live" /> AI engine: {engine}
+          </span>
+        )}
       </div>
 
       <div className="exp-sublabel mono">

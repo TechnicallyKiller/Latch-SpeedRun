@@ -5,6 +5,13 @@ export type Mode = "honest" | "adversarial";
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
+/** Human-readable name of the live LLM engine, for surfacing in the UI. */
+export function engineName(): string {
+  if (process.env.GROQ_API_KEY) return "Llama 3.3 70B · Groq";
+  if (process.env.ANTHROPIC_API_KEY) return "Claude Haiku 4.5 · Anthropic";
+  return "Deterministic (no AI key)";
+}
+
 /**
  * The job: classify three clues into the single common animal each describes. The verifier's
  * committed ground truth is { q1: cat, q2: dog, q3: bird } — so an agent that actually reads the
@@ -52,7 +59,8 @@ function parseAnswer(text: string): Record<string, string> | null {
  * the honest one reads the clues and is correct; the adversarial one is denied them and is
  * confidently wrong. Without a key, falls back to the deterministic answers so demos still work.
  */
-export async function work(mode: Mode): Promise<{ deliverable: Record<string, string>; ai: boolean }> {
+export async function work(mode: Mode): Promise<{ deliverable: Record<string, string>; ai: boolean; engine: string }> {
+  const engine = engineName();
   const system = mode === "honest" ? HONEST_SYSTEM : SCAMMER_SYSTEM;
   const content =
     mode === "honest"
@@ -64,11 +72,13 @@ export async function work(mode: Mode): Promise<{ deliverable: Record<string, st
     if (process.env.GROQ_API_KEY) text = await askGroq(system, content); // free, no credit card
     else if (process.env.ANTHROPIC_API_KEY) text = await askClaude(system, content);
 
-    if (text === null) return { deliverable: CANNED[mode], ai: false }; // no key set
+    if (text === null) return { deliverable: CANNED[mode], ai: false, engine }; // no key set
     const parsed = parseAnswer(text);
-    return { deliverable: parsed ?? CANNED[mode], ai: parsed !== null };
-  } catch {
-    return { deliverable: CANNED[mode], ai: false }; // never let a flaky API break the demo
+    console.log(`[ai] ${mode} agent via ${engine} → ${JSON.stringify(parsed ?? CANNED[mode])}`);
+    return { deliverable: parsed ?? CANNED[mode], ai: parsed !== null, engine };
+  } catch (e) {
+    console.log(`[ai] ${engine} call failed, using fallback:`, String(e));
+    return { deliverable: CANNED[mode], ai: false, engine };
   }
 }
 

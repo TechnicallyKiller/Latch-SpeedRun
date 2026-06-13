@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { snowtraceAddr, snowtraceTx, usdc, type Job } from "../chain";
 import { buildSteps } from "../lifecycle";
 import { Workflow } from "../components/Workflow";
@@ -40,6 +40,14 @@ export function Post() {
   const [selKey, setSelKey] = useState("create");
   const [refund, setRefund] = useState<bigint>(0n);
   const [withdrawTx, setWithdrawTx] = useState<`0x${string}` | null>(null);
+  const [engine, setEngine] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${SERVER}/api/config`)
+      .then((r) => r.json())
+      .then((c) => setEngine(c.engine))
+      .catch(() => setEngine(null));
+  }, []);
 
   const steps = useMemo(() => (job ? buildSteps(job) : []), [job]);
   const step = steps.find((s) => s.key === selKey) ?? steps[0];
@@ -165,6 +173,11 @@ export function Post() {
       </header>
 
       <div className="run-bar" style={{ flexDirection: "column", alignItems: "stretch", gap: 16 }}>
+        {engine && (
+          <span className="engine-badge mono" style={{ alignSelf: "flex-start" }} title="The provider agents are real LLM calls">
+            <span className="live" /> AI engine: {engine}
+          </span>
+        )}
         {!w ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <button className="btn btn-primary" onClick={doConnect} disabled={phase === "connecting"}>

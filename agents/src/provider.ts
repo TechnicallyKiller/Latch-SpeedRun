@@ -102,14 +102,14 @@ export function createProviderApp(cfg: ProviderConfig) {
       }
       const fund = await settle(jobId, decodePayment(header));
       const accept = await acceptJob(jobId, cfg.key);
-      const { deliverable } = await work(cfg.mode); // real Claude agent (or canned fallback)
+      const { deliverable, engine } = await work(cfg.mode); // real LLM agent (or canned fallback)
       const submit = await submitDeliverable(jobId, deliverable, cfg.key);
 
       res.set(
         "X-PAYMENT-RESPONSE",
         Buffer.from(JSON.stringify({ success: true, transaction: fund, network: NETWORK })).toString("base64"),
       );
-      res.json({ jobId: jobId.toString(), deliverable, txs: { fund, accept, submit } });
+      res.json({ jobId: jobId.toString(), deliverable, engine, txs: { fund, accept, submit } });
     } catch (err) {
       res.status(500).json({ error: String(err) });
     }

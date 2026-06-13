@@ -78,12 +78,19 @@ export function buildSteps(job: Job): Step[] {
       actor: "provider",
       status: job.submitted ? "done" : "idle",
       tx: job.submitted?.tx,
-      summary: "Provider does the work and submits a fingerprint of the deliverable.",
+      summary: "An AI agent does the work and submits a fingerprint of the deliverable.",
       detail:
-        "The provider produces its deliverable and submits a hash of it on-chain; the payload itself stays off-chain. An honest provider returns correct answers; an adversarial one returns well-formed-but-wrong answers — which shape-only escrow would happily pay for.",
+        "The provider is a real LLM agent. The honest one is given the task and answers correctly; the adversarial one is denied the source and returns well-formed-but-wrong answers — confident garbage that shape-only escrow would happily pay for. It submits a hash of its deliverable on-chain; the payload itself stays off-chain.",
       code: [
-        { lang: "ts", ref: "agents/provider.ts → /hire", note: "does the work, submits the hash" },
+        { lang: "ts", ref: "agents/shared/ai.ts → work()", note: "the LLM agent produces the deliverable" },
+        { lang: "ts", ref: "agents/provider.ts → /hire", note: "submits the deliverable hash" },
         { lang: "sol", ref: "LatchJob.submitDeliverable()", note: "records the submission hash" },
+      ],
+      data: [
+        ...(job.engine ? ([["AI engine", job.engine]] as [string, string][]) : []),
+        ...(job.deliverable
+          ? (Object.entries(job.deliverable).map(([k, v]) => [`answer · ${k}`, v]) as [string, string][])
+          : []),
       ],
     },
     {

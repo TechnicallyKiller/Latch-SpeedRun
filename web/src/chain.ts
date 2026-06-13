@@ -16,6 +16,8 @@ export interface Job {
   label: string;
   amount: bigint;
   bond: bigint;
+  engine?: string; // LLM that produced the deliverable (live runs)
+  deliverable?: Record<string, string>; // the agent's actual answers (live runs)
   created?: Stamp;
   funded?: Stamp;
   accepted?: Stamp;

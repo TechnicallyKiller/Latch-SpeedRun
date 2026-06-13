@@ -56,9 +56,9 @@ export async function runJudgeJob(p: JudgePayment, emit: (s: LiveStep) => void):
   const mode = p.mode === "fail" ? "adversarial" : "honest";
   const accept = await acceptJob(jobId, keys.provider);
   emit({ key: "accept", status: "done", tx: accept });
-  const { deliverable } = await work(mode); // real Claude agent (or canned fallback)
+  const { deliverable, engine } = await work(mode); // real LLM agent (or canned fallback)
   const submit = await submitDeliverable(jobId, deliverable, keys.provider);
-  emit({ key: "submit", status: "done", tx: submit, note: JSON.stringify(deliverable) });
+  emit({ key: "submit", status: "done", tx: submit, note: JSON.stringify(deliverable), engine });
 
   // 3) staked verifier scores it against the committed key
   emit({ key: "verify", status: "running" });

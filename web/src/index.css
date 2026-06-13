@@ -639,6 +639,18 @@ h2.title {
   border-color: #e6a86b;
 }
 
+.engine-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
 .judge-refund {
   display: flex;
   align-items: center;
